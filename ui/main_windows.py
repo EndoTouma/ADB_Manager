@@ -3,11 +3,9 @@ from PyQt5.QtWidgets import (
     QPushButton, QTextEdit, QLabel,
     QCheckBox, QLineEdit, QTabWidget, QGridLayout,QMessageBox, QComboBox,QFrame
 )
-from adb_controller.utils.adb_executor import execute_adb_command
-from adb_controller.utils.data_management import save_data, load_data
+from utils.adb_executor import execute_adb_command
+from utils.data_management import save_data, load_data
 from PyQt5.QtCore import Qt
-
-import traceback
 
 
 class ADBController(QWidget):
