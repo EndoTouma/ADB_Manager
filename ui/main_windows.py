@@ -194,17 +194,21 @@ class ADBController(QWidget):
         self.setWindowTitle("ADB Controller")
         self.setGeometry(100, 100, 500, 550)
         self.show()
-
+    
     def execute_adb_command_method(self):
-        selected_command = self.command_combobox.text()
-        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
-        for device in selected_devices:
-            execute_adb_command(device, selected_command, self.output_text)
-
-    def reload_ui(self):
-        for i in reversed(range(self.layout().count())):
-            self.layout().itemAt(i).widget().deleteLater()
-        self.init_ui()
+        try:
+            selected_command = self.command_combobox.currentText()
+            selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
+            for device in selected_devices:
+                execute_adb_command(device, selected_command, self.output_text)
+        except Exception as e:
+            error_dialog = QMessageBox()
+            error_dialog.setIcon(QMessageBox.Critical)
+            error_dialog.setWindowTitle("Ошибка")
+            error_dialog.setText("Произошла ошибка во время выполнения ADB команды")
+            error_dialog.setInformativeText(str(e))
+            error_dialog.addButton(QMessageBox.Ok)
+            error_dialog.exec()
 
     def show_message(self, title, message):
         msg = QMessageBox()
