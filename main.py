@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtGui import QIcon  # Добавляем необходимый импорт
+from PyQt5.QtGui import QIcon
 from ui.main_windows import ADBController
 
 if __name__ == "__main__":
