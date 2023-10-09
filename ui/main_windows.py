@@ -1,19 +1,18 @@
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QTextEdit, QLabel,
-    QCheckBox, QLineEdit, QTabWidget, QGridLayout,QMessageBox, QComboBox,QFrame
-)
+from ui.about_tab import AboutTab
+from PyQt5.QtWidgets import *
 from utils.adb_executor import execute_adb_command
-from utils.data_management import save_data, load_data
-from PyQt5.QtCore import Qt
+from utils.data_management import DataManager
+from utils.command_manager import CommandManager
+from utils.device_manager import DeviceManager
 
 
 class ADBController(QWidget):
     def __init__(self):
         super().__init__()
-
+        
         # Load saved data
-        self.load_data_method()
+        self.devices, self.commands = DataManager.load_data()
+    
 
         self.init_ui()
 
@@ -24,7 +23,7 @@ class ADBController(QWidget):
 
         tab_control = QWidget()
         tab_manage = QWidget()
-        tab_about = QWidget()
+        tab_about = AboutTab()
 
         tabs.addTab(tab_control, "Control")
         tabs.addTab(tab_manage, "Manage")
@@ -129,65 +128,6 @@ class ADBController(QWidget):
         layout_manage_commands.addLayout(add_command_layout)
         layout_manage_commands.addLayout(remove_command_layout)
 
-        # About Tab
-        layout_about = QVBoxLayout(tab_about)
-
-        # App Name
-        app_name_label = QLabel("ADB Controller")
-        app_name_font = app_name_label.font()
-        app_name_font.setPointSize(16)
-        app_name_font.setBold(True)
-        app_name_label.setFont(app_name_font)
-        layout_about.addWidget(app_name_label)
-
-        # App Version
-        app_version_label = QLabel("Version: 0.0.1")
-        layout_about.addWidget(app_version_label)
-
-        # Horizontal Line
-        horizontal_line = QFrame()
-        horizontal_line.setFrameShape(QFrame.HLine)
-        horizontal_line.setFrameShadow(QFrame.Sunken)
-        layout_about.addWidget(horizontal_line)
-
-        # Author Label
-        author_label = QLabel("Author: Eugene Vervai")
-        layout_about.addWidget(author_label)
-
-        # Contact
-        contact_label = QLabel("Contact: delspin1@gmail.com")
-        layout_about.addWidget(contact_label)
-
-        # License
-        license_label = QLabel("License: MIT License")
-        layout_about.addWidget(license_label)
-
-        # Description
-        description_label = QLabel("Description:")
-        layout_about.addWidget(description_label)
-
-        description_text = QTextEdit()
-        description_text.setText(
-            "ADB Controller is a user-friendly application designed to facilitate "
-            "the management and control of devices via Android Debug Bridge (ADB) "
-            "commands. The app allows users to easily add and remove devices and "
-            "commands to suit their specific requirements, providing an intuitive "
-            "graphical user interface to execute various ADB commands without the need "
-            "for manual command line input.\n\n"
-            "Key Features:\n"
-            "    - Manage and execute ADB commands on multiple devices simultaneously.\n"
-            "    - Add and remove devices and commands through a straightforward UI.\n"
-            "    - Monitor command execution outputs conveniently within the application.\n\n"
-            "Whether you are a developer, tester, or tech enthusiast, ADB Controller "
-            "aims to enhance your workflow by providing a convenient interface for "
-            "managing devices and executing ADB commands effortlessly."
-        )
-        description_text.setReadOnly(True)
-        layout_about.addWidget(description_text)
-
-        # Adjust spacings, alignments, etc.
-        layout_about.setAlignment(Qt.AlignTop)
-
         layout.addWidget(tabs)
         self.setLayout(layout)
 
@@ -195,97 +135,47 @@ class ADBController(QWidget):
         self.setGeometry(100, 100, 500, 550)
         self.show()
     
+    def save_data_method(self):
+        DataManager.save_data(self.devices, self.commands)
+    
     def execute_adb_command_method(self):
-        try:
-            selected_command = self.command_combobox.currentText()
-            selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
-            for device in selected_devices:
-                execute_adb_command(device, selected_command, self.output_text)
-        except Exception as e:
-            error_dialog = QMessageBox()
-            error_dialog.setIcon(QMessageBox.Critical)
-            error_dialog.setWindowTitle("Ошибка")
-            error_dialog.setText("Произошла ошибка во время выполнения ADB команды")
-            error_dialog.setInformativeText(str(e))
-            error_dialog.addButton(QMessageBox.Ok)
-            error_dialog.exec()
-
-    def show_message(self, title, message):
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Information)
-        msg.setWindowTitle(title)
-        msg.setText(message)
-        msg.exec_()
+        selected_command = self.command_combobox.currentText()
+        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
+        for device in selected_devices:
+            execute_adb_command(device, selected_command, self.output_text)
     
     def add_device(self):
-        try:
-            new_device = self.new_device_entry.text()
-            if new_device and new_device not in self.devices:
-                self.devices.append(new_device)
-                new_checkbox = QCheckBox(new_device)
-                self.device_checkboxes.append(new_checkbox)
-                row = (len(self.device_checkboxes) - 1) // 4
-                col = (len(self.device_checkboxes) - 1) % 4
-                self.devices_grid.addWidget(new_checkbox, row, col)
-                self.new_device_entry.clear()
-                self.remove_device_combo_box.addItem(new_device)
-                self.save_data_method()
-                QMessageBox.information(self, "Success", "Device added successfully!")
-            else:
-                QMessageBox.warning(self, "Warning", "Device is empty or already exists!")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
-
+        DeviceManager.add_device(
+            self.devices,
+            self.device_checkboxes,
+            self.devices_grid,
+            self.new_device_entry,
+            self.remove_device_combo_box,
+            self.save_data_method
+        )
+    
     def remove_device(self):
-        try:
-            remove_device = self.remove_device_combo_box.currentText()
-            if remove_device and remove_device in self.devices:
-                device_index = self.devices.index(remove_device)
-                self.devices.remove(remove_device)
-                self.remove_device_combo_box.removeItem(device_index)
-                removed_checkbox = self.device_checkboxes.pop(device_index)
-                self.devices_grid.removeWidget(removed_checkbox)
-                removed_checkbox.deleteLater()
-                self.save_data_method()
-                QMessageBox.information(self, "Success", "Device removed successfully!")
-            else:
-                QMessageBox.warning(self, "Warning", "Device doesn't exist or input is empty!")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
-
+        DeviceManager.remove_device(
+            self.devices,
+            self.device_checkboxes,
+            self.devices_grid,
+            self.remove_device_combo_box,
+            self.save_data_method
+        )
+    
     def add_command(self):
-        try:
-            new_command = self.new_command_entry.text()
-            if new_command and new_command not in self.commands:
-                self.commands.append(new_command)
-                self.new_command_entry.clear()
-                self.save_data_method()
-                self.command_combobox.addItem(new_command)
-                self.remove_command_combobox.addItem(new_command)
-                QMessageBox.information(self, "Success", "Command added successfully!")
-            else:
-                QMessageBox.warning(self, "Warning", "Command is empty or already exists!")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
-
+        CommandManager.add_command(
+            self.commands,
+            self.new_command_entry,
+            self.command_combobox,
+            self.remove_command_combobox,
+            self.save_data_method
+        )
+    
     def remove_command(self):
-        try:
-            remove_command = self.remove_command_combobox.currentText()
-            if remove_command and remove_command in self.commands:
-                self.commands.remove(remove_command)
-                index_to_remove = self.command_combobox.findText(remove_command)
-                self.command_combobox.removeItem(index_to_remove)
-                index_to_remove_remove_section = self.remove_command_combobox.findText(remove_command)
-                self.remove_command_combobox.removeItem(index_to_remove_remove_section)
-                self.save_data_method()
-                QMessageBox.information(self, "Success", "Command successfully removed!")
-            else:
-                QMessageBox.warning(self, "Error", "Command doesn't exist!")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
-
-    def save_data_method(self):
-        save_data(self.devices, self.commands)
-
-    def load_data_method(self):
-        self.devices, self.commands = load_data()
+        CommandManager.remove_command(
+            self.commands,
+            self.command_combobox,
+            self.remove_command_combobox,
+            self.save_data_method
+        )
