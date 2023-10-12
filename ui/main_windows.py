@@ -53,6 +53,7 @@ class ADBController(QWidget):
         self.command_combobox = QComboBox()
         self.command_combobox.setEditable(False)
         self.command_combobox.addItems(self.commands)
+        self.command_combobox.setCurrentIndex(-1)
 
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
@@ -97,6 +98,7 @@ class ADBController(QWidget):
         self.remove_device_combo_box = QComboBox()
         self.remove_device_combo_box.setFixedWidth(200)
         self.remove_device_combo_box.addItems(self.devices)
+        self.remove_device_combo_box.setCurrentIndex(-1)
         remove_device_button = QPushButton("Remove Device")
         remove_device_button.setFixedWidth(100)
         remove_device_button.setFixedHeight(20)
@@ -125,6 +127,7 @@ class ADBController(QWidget):
         self.remove_command_combobox = QComboBox()
         self.remove_command_combobox.setFixedWidth(300)
         self.remove_command_combobox.addItems(self.commands)
+        self.remove_command_combobox.setCurrentIndex(-1)
         remove_command_button = QPushButton("Remove Command")
         remove_command_button.clicked.connect(self.remove_command)
         remove_command_layout.addWidget(self.remove_command_combobox)
@@ -142,6 +145,7 @@ class ADBController(QWidget):
     
     def save_data_method(self):
         DataManager.save_data(self.devices, self.commands)
+    
     
     def execute_adb_command_method(self):
         selected_command = self.command_combobox.currentText()
