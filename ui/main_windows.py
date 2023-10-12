@@ -34,12 +34,17 @@ class ADBController(QWidget):
 
         devices_label = QLabel("Available devices: ")
         devices_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        
+        self.devices.sort()
+        
         self.devices_grid = QGridLayout()
         self.device_checkboxes = [QCheckBox(device) for device in self.devices]
-
+        
+        num_rows = len(self.device_checkboxes) // 4 + (len(self.device_checkboxes) % 4 != 0)
+        
         for index, checkbox in enumerate(self.device_checkboxes):
-            row = index // 4
-            col = index % 4
+            col = index // num_rows
+            row = index % num_rows
             self.devices_grid.addWidget(checkbox, row, col)
 
         execute_button = QPushButton("Execute")
