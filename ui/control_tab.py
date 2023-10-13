@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import *
 
 from utils.adb_executor import execute_adb_command
 
@@ -17,20 +17,15 @@ class ControlTab(QWidget):
     def init_ui(self):
         layout_control = QVBoxLayout(self)
         
-        # Стилизация заголовков
         font_bold = QFont()
         font_bold.setBold(True)
         
-        # Devices UI
         devices_group = self.create_group("Available Devices", self.devices_ui())
         
-        # Commands UI
         commands_group = self.create_group("ADB Commands", self.commands_ui())
         
-        # Output UI
         output_group = self.create_group("Output", self.output_ui())
         
-        # Add groups to main layout
         layout_control.addWidget(devices_group)
         layout_control.addWidget(commands_group)
         layout_control.addWidget(output_group)
@@ -76,7 +71,6 @@ class ControlTab(QWidget):
         layout.addWidget(self.command_combobox)
         layout.addWidget(execute_button)
         
-        # Set spacing and margins
         layout.setSpacing(10)
         layout.setContentsMargins(10, 10, 10, 10)
         
@@ -90,7 +84,6 @@ class ControlTab(QWidget):
         
         layout.addWidget(self.output_text)
         
-        # Set spacing and margins
         layout.setSpacing(10)
         layout.setContentsMargins(10, 10, 10, 10)
         
@@ -133,7 +126,7 @@ class ControlTab(QWidget):
             col = index // num_rows
             row = index % num_rows
             self.devices_grid.addWidget(checkbox, row, col)
-            
+        
         if remove_device_combo_box:
             remove_device_combo_box.clear()
             remove_device_combo_box.addItems(devices)
