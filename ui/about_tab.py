@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTextEdit, QGroupBox
-from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTextEdit, QGroupBox
 
 
 class AboutTab(QWidget):
@@ -11,11 +11,9 @@ class AboutTab(QWidget):
     def init_ui(self):
         layout_about = QVBoxLayout(self)
         
-        # App Info Group
         app_info_group = self.create_group("App Information", self.app_info_ui())
         layout_about.addWidget(app_info_group)
         
-        # Description Group
         description_group = self.create_group("Description", self.description_ui())
         layout_about.addWidget(description_group)
         
@@ -39,7 +37,6 @@ class AboutTab(QWidget):
     def app_info_ui(self):
         layout = QVBoxLayout()
         
-        # Elements: Labels and Line
         labels_text = [
             ("ADB Controller", 12, True),
             ("Version: 0.0.1", 9, False),
@@ -62,7 +59,6 @@ class AboutTab(QWidget):
     def description_ui(self):
         layout = QVBoxLayout()
         
-        # Description Text
         description_text = QTextEdit()
         description_text.setText(
             "ADB Controller is a user-friendly application designed to facilitate "
