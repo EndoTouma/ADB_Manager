@@ -19,9 +19,11 @@ class ManageTab(QWidget):
         layout = QVBoxLayout(self)
         
         layout.addWidget(self.create_group("Add a New Device in Available Device list", self.manage_device_ui()))
-        layout.addWidget(self.create_group("Remove an Existing Device from Available Device list", self.remove_device_ui()))
+        layout.addWidget(
+            self.create_group("Remove an Existing Device from Available Device list", self.remove_device_ui()))
         layout.addWidget(self.create_group("Add a New Command in ADB Commands list", self.add_command_ui()))
-        layout.addWidget(self.create_group("Remove an Existing Command from ADB Commands list", self.remove_command_ui()))
+        layout.addWidget(
+            self.create_group("Remove an Existing Command from ADB Commands list", self.remove_command_ui()))
         
         self.setLayout(layout)
     
