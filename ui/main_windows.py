@@ -1,11 +1,8 @@
-from datetime import datetime
-
 from PyQt5.QtWidgets import *
 
 from ui.about_tab import AboutTab
 from ui.control_tab import ControlTab
 from ui.manage_tab import ManageTab
-from utils.adb_executor import execute_adb_command
 from utils.command_manager import CommandManager
 from utils.data_management import DataManager
 from utils.device_manager import DeviceManager
@@ -15,7 +12,6 @@ class ADBController(QWidget):
     def __init__(self):
         super().__init__()
         
-        # Load saved data
         self.devices, self.commands = DataManager.load_data()
         self.tab_control = ControlTab(self.devices, self.commands)
         
@@ -30,7 +26,6 @@ class ADBController(QWidget):
         
         tabs.addTab(self.tab_control, "Control")
         
-        # Создаем экземпляр ManageTab и добавляем его как вкладку
         self.tab_manage = ManageTab(
             self.devices,
             self.commands,
