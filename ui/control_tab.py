@@ -21,11 +21,29 @@ class ControlTab(QWidget):
         font_bold = QFont()
         font_bold.setBold(True)
         
-        devices_label = QLabel("Available devices: ")
-        devices_label.setFont(font_bold)
+        # Devices UI
+        devices_group = self.create_group("Available Devices", self.devices_ui())
+        
+        # Commands UI
+        commands_group = self.create_group("ADB Commands", self.commands_ui())
+        
+        # Output UI
+        output_group = self.create_group("Output", self.output_ui())
+        
+        # Add groups to main layout
+        layout_control.addWidget(devices_group)
+        layout_control.addWidget(commands_group)
+        layout_control.addWidget(output_group)
+    
+    def create_group(self, title, layout):
+        group = QGroupBox(title)
+        group.setLayout(layout)
+        return group
+    
+    def devices_ui(self):
+        layout = QVBoxLayout()
         
         self.devices.sort()
-        
         self.devices_grid = QGridLayout()
         self.device_checkboxes = [QCheckBox(device) for device in self.devices]
         
@@ -36,30 +54,47 @@ class ControlTab(QWidget):
             row = index % num_rows
             self.devices_grid.addWidget(checkbox, row, col)
         
-        execute_button = QPushButton("Execute")
-        execute_button.clicked.connect(self.execute_adb_command_method)
+        layout.addLayout(self.devices_grid)
         
+        # Установка расстояния между виджетами и внешних отступов
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        return layout
+    
+    def commands_ui(self):
+        layout = QVBoxLayout()
         
         self.command_combobox = QComboBox()
         self.command_combobox.setEditable(False)
         self.command_combobox.addItems(self.commands)
         self.command_combobox.setCurrentIndex(-1)
         
+        execute_button = QPushButton("Execute")
+        execute_button.clicked.connect(self.execute_adb_command_method)
+        
+        layout.addWidget(self.command_combobox)
+        layout.addWidget(execute_button)
+        
+        # Set spacing and margins
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        return layout
+    
+    def output_ui(self):
+        layout = QVBoxLayout()
+        
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
         
-        layout_control.addWidget(devices_label)
-        layout_control.addLayout(self.devices_grid)
-        command_label = QLabel("Command: ")
-        command_label.setFont(font_bold)
-        layout_control.addWidget(command_label)
-        layout_control.addWidget(self.command_combobox)
-        layout_control.addWidget(execute_button)
-        output_label = QLabel("Output: ")
-        output_label.setFont(font_bold)
-        layout_control.addWidget(output_label)
+        layout.addWidget(self.output_text)
         
-        layout_control.addWidget(self.output_text)
+        # Set spacing and margins
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        return layout
     
     def execute_adb_command_method(self):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
