@@ -1,43 +1,42 @@
 # ADB Controller 🚀
 
-Эффективный и легкий способ управления вашими ADB устройствами прямо с вашего компьютера.
+An efficient and lightweight way to manage your ADB devices directly from your computer.
+## 🎯 Goal
 
-## 🎯 Цель
+The aim of ADB Controller is to provide a convenient, easy-to-use interface for managing Android devices through [Android Debug Bridge (ADB)](https://developer.android.com/studio/command-line/adb).
 
-Цель ADB Controller - предоставить удобный, простой в использовании интерфейс для управления устройствами Android через [Android Debug Bridge (ADB)](https://developer.android.com/studio/command-line/adb).
+## 🛠️ Installation and Launch
 
-## 🛠️ Установка и Запуск
-
-### Требования
+### Requirements
 
 - Python 3.x
 - PyQt5
 - [Android Debug Bridge (ADB)](https://developer.android.com/studio/releases/platform-tools)
 
-### Шаги Установки
+### Installation Steps
 
-1. Клонируйте репозиторий:
+1. Clone the repository:
    ```sh
-   git clone https://github.com/your_username/ADBController.git
+   git clone https://github.com/EndoTouma/ADBController.git
    
-2. Перейдите в директорию проекта:
+2. Navigate to the project directory:
     ```sh
     cd ADBController
    
-3. Установите зависимости:
+3. Install the dependencies:
     ```sh
    pip install -r requirements.txt
    
-4. Запустите приложение:
+4. Launch the application:
     ```sh
    python main.py
    
-## 📋 Лицензия
-Этот проект лицензирован под лицензией MIT - подробности см. в файле LICENSE.md.
+## 📋 License
+This project is licensed under the MIT License - see the LICENSE.md file for details.
 
-## 📧 Контакты
-Ваше Имя - https://t.me/EndoTouma
+## 📧 Contact
+Telegram - https://t.me/EndoTouma
 
-Электронная почта - delspin1@gmail.com
+Email - delspin1@gmail.com
 
-Проектная ссылка: https://github.com/EndoTouma/ADBController
+Project Link: https://github.com/EndoTouma/ADBController
