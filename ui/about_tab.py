@@ -9,7 +9,7 @@ class AboutTab(QWidget):
     """
     APP_INFO_LABELS = [
         ("ADB Controller", 12, True),
-        ("Version: 0.5.0", 9, False),
+        ("Version: 1.0.0", 9, False),
         ("Author: Eugene Vervai", 9, False),
         ("Contact: delspin1@gmail.com", 9, False),
         ("License: MIT License", 9, False)
