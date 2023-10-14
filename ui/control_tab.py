@@ -4,6 +4,7 @@ from PyQt5.QtGui import QFontMetrics
 from PyQt5.QtCore import Qt
 
 from utils.adb_executor import execute_adb_command
+from utils.data_management import DataManager
 
 
 class ControlTab(QWidget):
@@ -18,6 +19,7 @@ class ControlTab(QWidget):
         self.devices = devices
         self.commands = commands
         self.device_checkboxes = []
+        self.devices, self.commands = DataManager.load_data()
         self.init_ui()
     
     def init_ui(self):
@@ -141,6 +143,8 @@ class ControlTab(QWidget):
             # Appending the new device and updating the grid layout.
             self.devices.append(f"{ip}:{port}")
             self.update_device_grid(self.devices)
+            
+            DataManager.save_data(self.devices,self.commands)
     
     def execute_adb_command_method(self):
         """
@@ -208,6 +212,8 @@ class ControlTab(QWidget):
             devices_to_delete = dialog.get_selected_devices()
             self.devices = [dev for dev in self.devices if dev not in devices_to_delete]
             self.update_device_grid(self.devices)
+            
+            DataManager.save_data(self.devices,self.commands)
     
     def select_all_devices(self):
         """
@@ -235,6 +241,8 @@ class ControlTab(QWidget):
         if ok and text:
             self.commands.append(text)
             self.command_combobox.addItem(text)
+            
+            DataManager.save_data(self.devices,self.commands)
     
     def delete_command(self):
         """
@@ -247,6 +255,8 @@ class ControlTab(QWidget):
             self.commands = [cmd for cmd in self.commands if cmd not in commands_to_delete]
             self.command_combobox.clear()
             self.command_combobox.addItems(self.commands)
+            
+            DataManager.save_data(self.devices,self.commands)
 
 
 class DeleteDeviceDialog(QDialog):
