@@ -1,6 +1,8 @@
 # ADB Controller 🚀
 
-An efficient and easy way to manage your ADB devices directly from your computer.## 🎯 Goal
+An efficient and easy way to manage your ADB devices directly from your computer.
+
+## 🎯 Goal
 
 The aim of ADB Controller is to provide a convenient, easy-to-use interface for managing Android devices through [Android Debug Bridge (ADB)](https://developer.android.com/studio/command-line/adb).
 
