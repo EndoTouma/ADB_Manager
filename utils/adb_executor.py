@@ -13,8 +13,14 @@ def decode_output(output_bytes):
 def execute_adb_command(device, command, output_text_widget):
     execution_time = 0
     try:
-        output_text_widget.append(f"\nВыполнение '{command}' на устройстве: {device}\n")
-        adb_command = f"adb -s {device} {command}"
+        output_text_widget.append(f"\n<strong>Executing</strong> '{command}' on device: {device}\n")
+        
+        if command.startswith("connect"):
+            adb_command = f"adb {command} {device}"
+        elif command.startswith("disconnect"):
+            adb_command = f"adb {command} {device}"
+        else:
+            adb_command = f"adb -s {device} {command}"
         
         start_time = time.time()
         
@@ -24,16 +30,18 @@ def execute_adb_command(device, command, output_text_widget):
         end_time = time.time()
         execution_time = round(end_time - start_time, 2)
         
-        output_text_widget.append(f"Вывод: {decode_output(output)}\n")
-        output_text_widget.append(f"Ошибка: {decode_output(error)}\n")
+        message = error if error else output
+        output_text_widget.append(f"<strong>Result</strong>: {decode_output(message)}\n")
+    
     except Exception as e:
-        
         error_dialog = QMessageBox()
         error_dialog.setIcon(QMessageBox.Critical)
-        error_dialog.setWindowTitle("Ошибка")
-        error_dialog.setText("Произошла ошибка при попытке выполнить ADB команду.")
+        error_dialog.setWindowTitle("Error")
+        error_dialog.setText("An error occurred while attempting to execute the ADB command.")
         error_dialog.setInformativeText(str(e))
         error_dialog.addButton(QMessageBox.Ok)
         error_dialog.exec()
     
     return execution_time
+
+
