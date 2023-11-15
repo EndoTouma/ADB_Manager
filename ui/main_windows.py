@@ -4,8 +4,8 @@ from ui.about_tab import AboutTab
 from ui.control_tab import ControlTab
 from utils.data_management import DataManager
 
-WINDOW_WIDTH = 500
-WINDOW_HEIGHT = 600
+WINDOW_WIDTH = 700
+WINDOW_HEIGHT = 900
 WINDOW_X_POS = 100
 WINDOW_Y_POS = 100
 
@@ -41,10 +41,10 @@ class ADBController(QWidget):
         # Layout setup
         layout.addWidget(tabs)
         self.setLayout(layout)
-
-        # Window setup
+        
         self.setWindowTitle("ADB Controller")
         self.setGeometry(WINDOW_X_POS, WINDOW_Y_POS, WINDOW_WIDTH, WINDOW_HEIGHT)
+        self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.show()
 
     def save_data_method(self):
