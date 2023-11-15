@@ -1,3 +1,5 @@
+import subprocess
+
 from datetime import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QFontMetrics
@@ -58,18 +60,30 @@ class ControlTab(QWidget):
         
         layout.addLayout(self.devices_grid)
         
-        # Create and add control buttons.
-        buttons = [
+        # Create and add first row of control buttons.
+        first_row_buttons = [
             ("Select All", self.select_all_devices),
             ("Add Device", self.add_device),
             ("Delete Device", self.delete_device)
         ]
-        button_layout = self.create_button_layout(buttons)
-        layout.addLayout(button_layout)
+        first_row_button_layout = self.create_button_layout(first_row_buttons, add_stretch=False)
+        layout.addLayout(first_row_button_layout)
+        
+        # Create and add second row of control buttons with space between them.
+        second_row_buttons = [
+            ("Connect", self.connect_devices),
+            ("Scrcpy", self.connect_via_scrcpy),
+            ("Disconnect", self.disconnect_devices)
+        ]
+        second_row_button_layout = self.create_button_layout(second_row_buttons, add_stretch=True)
+        
+        layout.addLayout(first_row_button_layout)
+        layout.addLayout(second_row_button_layout)
         
         self.apply_standard_margins_and_spacing(layout)
         return layout
     
+        
     def commands_ui(self):
         """Create and configure UI for command management."""
         layout = QVBoxLayout()
@@ -102,22 +116,45 @@ class ControlTab(QWidget):
         self.apply_standard_margins_and_spacing(layout)
         return layout
     
-    def create_button_layout(self, buttons):
+    def create_button_layout(self, buttons, add_stretch=False):
         """Create a button layout based on a list of pairs (button text, callback function)."""
         button_layout = QHBoxLayout()
         for text, callback in buttons:
             button = self.create_button(text, callback)
-            button.setFixedSize(self.SMALL_BUTTON_WIDTH, self.SMALL_BUTTON_HEIGHT)
             button_layout.addWidget(button)
+            
+            if add_stretch and text == "Connect":
+                button_layout.addStretch(1)
+        
+        if not add_stretch:
+            button_layout.addStretch(1)
+        
         return button_layout
     
-    def create_button(self, text, callback, width=None, height=None):
+    def create_button(self, text, callback):
         """Create a button with specified text and callback function."""
         button = QPushButton(text)
-        button.setFixedSize(width if width is not None else self.BUTTON_WIDTH,
-                            height if height is not None else self.BUTTON_HEIGHT)
+        button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         button.clicked.connect(callback)
         return button
+    
+    def create_button_layout(self, buttons, add_stretch=False):
+        """Создать макет для кнопок на основе списка пар (текст кнопки, функция обратного вызова)."""
+        button_layout = QHBoxLayout()
+        if add_stretch:
+            button_layout.addStretch(1)  # Добавить растягиваемое пространство перед первой кнопкой
+        
+        for text, callback in buttons:
+            button = self.create_button(text, callback)
+            button_layout.addWidget(button)
+            
+            if text == "Connect":
+                button_layout.addSpacing(10)
+        
+        if add_stretch:
+            button_layout.addStretch(1)
+        
+        return button_layout
     
     def apply_standard_margins_and_spacing(self, layout):
         """
@@ -146,13 +183,99 @@ class ControlTab(QWidget):
             
             DataManager.save_data(self.devices,self.commands)
     
+    def connect_devices(self):
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.output_text.append(f"<strong>CONNECT COMMAND</strong>: {current_time}\n")
+        
+        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
+        if not selected_devices:
+            QMessageBox.warning(self, "Warning", "Please select at least one device to connect.")
+            return
+        
+        total_execution_time = 0
+        progress_dialog = QProgressDialog("Connecting devices...", None, 0, len(selected_devices), self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setAutoClose(False)
+        progress_dialog.setAutoReset(False)
+        progress_dialog.setMinimumWidth(400)
+        
+        for i, device in enumerate(selected_devices):
+            if progress_dialog.wasCanceled():
+                break
+            progress_dialog.setValue(i)
+            progress_dialog.setLabelText(f"Connecting {device}...")
+            QApplication.processEvents()  # Update the dialog's appearance
+            try:
+                total_execution_time += execute_adb_command(device, "connect", self.output_text)
+            except Exception as e:
+                self.output_text.append(f"ERROR connecting {device}: {str(e)}\n")
+        
+        progress_dialog.setValue(len(selected_devices))
+        progress_dialog.setLabelText("Connection complete. Click 'Ok' to exit.")
+        progress_dialog.setCancelButtonText("Ok")
+        progress_dialog.canceled.connect(progress_dialog.close)
+        self.output_text.append(f"<strong>Total connection time</strong>: {total_execution_time} seconds\n")
+        self.output_text.append("<strong>-</strong>" * 120 + "\n")
+    
+    def connect_via_scrcpy(self):
+        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
+        if not selected_devices:
+            QMessageBox.warning(self, "Warning", "Please select at least one device to connect via Scrcpy.")
+            return
+        
+        for device in selected_devices:
+            # Extract just the IP part if the device string contains port as well
+            command = f"C:/adb/scrcpy.exe --tcpip={device}"
+            try:
+                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output, error = process.communicate()
+                if error:
+                    QMessageBox.critical(self, "Error",
+                                         f"Failed to start Scrcpy for device {device}: {error.decode('utf-8', 'ignore')}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"An exception occurred: {e}")
+    
+    def disconnect_devices(self):
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.output_text.append(f"<strong>DISCONNECT COMMAND</strong>: {current_time}\n")
+        
+        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
+        if not selected_devices:
+            QMessageBox.warning(self, "Warning", "Please select at least one device to disconnect.")
+            return
+        
+        total_execution_time = 0
+        progress_dialog = QProgressDialog("Disconnecting devices...", None, 0, len(selected_devices), self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setAutoClose(False)
+        progress_dialog.setAutoReset(False)
+        progress_dialog.setMinimumWidth(400)
+        
+        for i, device in enumerate(selected_devices):
+            if progress_dialog.wasCanceled():
+                break
+            progress_dialog.setValue(i)
+            progress_dialog.setLabelText(f"Disconnecting {device}...")
+            QApplication.processEvents()  # Update the dialog's appearance
+            try:
+                total_execution_time += execute_adb_command(device, "disconnect", self.output_text)
+            except Exception as e:
+                self.output_text.append(f"ERROR disconnecting {device}: {str(e)}\n")
+        
+        progress_dialog.setValue(len(selected_devices))
+        progress_dialog.setLabelText("Disconnection complete. Click 'Ok' to exit.")
+        progress_dialog.setCancelButtonText("Ok")
+        progress_dialog.canceled.connect(progress_dialog.close)
+        self.output_text.append(f"<strong>Total disconnection time</strong>: {total_execution_time} seconds\n")
+        self.output_text.append("<strong>-</strong>" * 120 + "\n")
+    
     def execute_adb_command_method(self):
         """
         Execute the selected ADB command on the selected devices.
         Append the output and any errors to the output_text QTextEdit.
         """
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.output_text.append(f"NEW COMMAND: {current_time}\n")
+        self.output_text.append(f"<strong>NEW COMMAND</strong>: {current_time}\n")
         
         selected_command = self.command_combobox.currentText()
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
@@ -162,14 +285,30 @@ class ControlTab(QWidget):
             return
         
         total_execution_time = 0
-        for device in selected_devices:
+        progress_dialog = QProgressDialog("Executing commands...", "Cancel", 0, len(selected_devices), self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setAutoClose(False)
+        progress_dialog.setAutoReset(False)
+        progress_dialog.setMinimumWidth(400)
+        
+        for i, device in enumerate(selected_devices):
+            if progress_dialog.wasCanceled():
+                break
+            progress_dialog.setValue(i)
+            progress_dialog.setLabelText(f"Executing on {device}...")
+            QApplication.processEvents()  # Update the dialog's appearance
             try:
-                total_execution_time += execute_adb_command(device, selected_command, self.output_text)
+                execution_time = execute_adb_command(device, selected_command, self.output_text)
+                total_execution_time += execution_time
             except Exception as e:
                 self.output_text.append(f"ERROR executing on {device}: {str(e)}\n")
         
-        self.output_text.append(f"Total execution time: {total_execution_time} seconds\n")
-        self.output_text.append("-" * 120 + "\n")
+        progress_dialog.setValue(len(selected_devices))
+        progress_dialog.setLabelText("Execution complete. Click 'Ok' to exit.")
+        progress_dialog.setCancelButtonText("Ok")
+        progress_dialog.canceled.connect(progress_dialog.close)
+        self.output_text.append(f"<strong>Total execution time:</strong> {total_execution_time} seconds\n")
+        self.output_text.append("<strong>-</strong>" * 120 + "\n")
     
     def update_device_grid(self, devices, remove_device_combo_box=None):
         """
