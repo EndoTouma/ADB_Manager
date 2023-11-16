@@ -23,6 +23,7 @@ class ControlTab(QWidget):
         self.device_checkboxes = []
         self.devices, self.commands = DataManager.load_data()
         self.init_ui()
+        self.scrcpy_processes = {}
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -224,16 +225,24 @@ class ControlTab(QWidget):
             return
         
         for device in selected_devices:
-            # Extract just the IP part if the device string contains port as well
             command = f"C:/adb/scrcpy.exe --tcpip={device}"
             try:
                 process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                output, error = process.communicate()
-                if error:
-                    QMessageBox.critical(self, "Error",
-                                         f"Failed to start Scrcpy for device {device}: {error.decode('utf-8', 'ignore')}")
+                self.scrcpy_processes[device] = process
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"An exception occurred: {e}")
+    
+    def terminate_scrcpy_process(self, device):
+        process = self.scrcpy_processes.get(device)
+        if process:
+            process.terminate()
+            process.wait()
+            del self.scrcpy_processes[device]
+    
+    def closeEvent(self, event):
+        for device in list(self.scrcpy_processes):
+            self.terminate_scrcpy_process(device)
+        event.accept()
     
     def disconnect_devices(self):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
