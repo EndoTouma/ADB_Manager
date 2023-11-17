@@ -4,6 +4,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QFontMetrics
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette, QColor
 
 from utils.adb_executor import execute_adb_command
 from utils.data_management import DataManager
@@ -37,6 +38,57 @@ class ControlTab(QWidget):
         layout_control.addWidget(devices_group)
         layout_control.addWidget(commands_group)
         layout_control.addWidget(output_group)
+        refresh_status_button = QPushButton("Refresh Status")
+        refresh_status_button.clicked.connect(self.refresh_device_status)
+        layout_control.addWidget(refresh_status_button)
+        self.check_device_status()
+    
+    def refresh_device_status(self):
+        # Отображение окна прогресса
+        progress_dialog = QProgressDialog("Checking device status...", "Cancel", 0, len(self.device_checkboxes), self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setMinimumWidth(300)
+        progress_dialog.show()
+        
+        for i, checkbox in enumerate(self.device_checkboxes):
+            if progress_dialog.wasCanceled():
+                break
+            progress_dialog.setValue(i)
+            progress_dialog.setLabelText(f"Checking {checkbox.text()}...")
+            QApplication.processEvents()  # Обновление UI
+            
+            # Проверка статуса устройства
+            if self.is_device_connected(checkbox.text()):
+                self.update_device_status_ui(checkbox, "connected")
+            else:
+                self.update_device_status_ui(checkbox, "disconnected")
+        
+        progress_dialog.setValue(len(self.device_checkboxes))
+    
+    def check_device_status(self):
+        for checkbox in self.device_checkboxes:
+            device = checkbox.text()
+            if self.is_device_connected(device):
+                self.update_device_status_ui(checkbox, "connected")
+            else:
+                self.update_device_status_ui(checkbox, "disconnected")
+    
+    def update_device_status_ui(self, checkbox, status):
+        palette = QPalette()
+        if status == "connected":
+            palette.setColor(QPalette.Active, QPalette.WindowText, QColor('green'))
+        else:
+            palette.setColor(QPalette.Active, QPalette.WindowText, QColor('red'))
+        checkbox.setPalette(palette)
+    
+    def is_device_connected(self, device):
+        # Настройка STARTUPINFO для скрытия окна командной строки
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        
+        # Запуск процесса без отображения окна командной строки
+        result = subprocess.run(['adb', 'devices'], capture_output=True, text=True, startupinfo=startupinfo)
+        return device in result.stdout
     
     def create_group(self, title, layout):
         """Create a UI group with a given title and layout."""
@@ -84,7 +136,6 @@ class ControlTab(QWidget):
         self.apply_standard_margins_and_spacing(layout)
         return layout
     
-        
     def commands_ui(self):
         """Create and configure UI for command management."""
         layout = QVBoxLayout()
@@ -92,7 +143,9 @@ class ControlTab(QWidget):
         self.command_combobox.setEditable(False)
         self.command_combobox.addItems(self.commands)
         self.command_combobox.setCurrentIndex(-1)
-        self.command_combobox.setFixedWidth(550)
+        
+        # Установка политики размера для растягивания комбобокса
+        self.command_combobox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         
         layout.addWidget(self.command_combobox)
         
@@ -174,15 +227,13 @@ class ControlTab(QWidget):
         if ok and text:
             try:
                 ip, port = text.split(":")
+                # ... код для добавления устройства ...
+                self.devices.append(f"{ip}:{port}")
+                self.update_device_grid(self.devices)
+                DataManager.save_data(self.devices, self.commands)
+                self.check_device_status()  # Обновление статуса устройства
             except ValueError:
                 QMessageBox.warning(self, "Invalid input", "Please use format: IP:Port.")
-                return
-            
-            # Appending the new device and updating the grid layout.
-            self.devices.append(f"{ip}:{port}")
-            self.update_device_grid(self.devices)
-            
-            DataManager.save_data(self.devices,self.commands)
     
     def connect_devices(self):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -217,6 +268,8 @@ class ControlTab(QWidget):
         progress_dialog.canceled.connect(progress_dialog.close)
         self.output_text.append(f"<strong>Total connection time</strong>: {total_execution_time} seconds\n")
         self.output_text.append("<strong>-</strong>" * 120 + "\n")
+        
+        self.check_device_status()
     
     def connect_via_scrcpy(self):
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
@@ -277,6 +330,8 @@ class ControlTab(QWidget):
         progress_dialog.canceled.connect(progress_dialog.close)
         self.output_text.append(f"<strong>Total disconnection time</strong>: {total_execution_time} seconds\n")
         self.output_text.append("<strong>-</strong>" * 120 + "\n")
+        
+        self.check_device_status()  # Обновление статуса устройства после попытки отключения
     
     def execute_adb_command_method(self):
         """
@@ -360,8 +415,8 @@ class ControlTab(QWidget):
             devices_to_delete = dialog.get_selected_devices()
             self.devices = [dev for dev in self.devices if dev not in devices_to_delete]
             self.update_device_grid(self.devices)
-            
-            DataManager.save_data(self.devices,self.commands)
+            DataManager.save_data(self.devices, self.commands)
+            self.check_device_status()  # Обновление статуса устройства
     
     def select_all_devices(self):
         """
