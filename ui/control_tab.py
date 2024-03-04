@@ -1,10 +1,8 @@
 import subprocess
-
 from datetime import datetime
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QFontMetrics
+from PyQt5.QtGui import QFontMetrics, QPalette, QColor
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette, QColor
 
 from utils.adb_executor import execute_adb_command
 from utils.data_management import DataManager
@@ -17,53 +15,68 @@ class ControlTab(QWidget):
     SMALL_BUTTON_HEIGHT = 23
     
     def __init__(self, devices, commands):
-        """Initialize ControlTab widget with specified devices and commands."""
         super().__init__()
         self.devices = devices
         self.commands = commands
         self.device_checkboxes = []
         self.devices, self.commands = DataManager.load_data()
         self.init_ui()
-        self.scrcpy_processes = {}
     
     def init_ui(self):
-        """Initialize the user interface."""
         layout_control = QVBoxLayout(self)
-        
-        # Create UI groups and add them to the main layout.
         devices_group = self.create_group("Available Devices", self.devices_ui())
         commands_group = self.create_group("ADB Commands", self.commands_ui())
         output_group = self.create_group("Output", self.output_ui())
-        
         layout_control.addWidget(devices_group)
         layout_control.addWidget(commands_group)
         layout_control.addWidget(output_group)
-        refresh_status_button = QPushButton("Refresh Status")
-        refresh_status_button.clicked.connect(self.refresh_device_status)
-        layout_control.addWidget(refresh_status_button)
+        self.refresh_button = QPushButton('Refresh Status', self)
+        self.refresh_button.clicked.connect(self.refresh_device_list)
+        layout_control.addWidget(self.refresh_button)
         self.check_device_status()
     
-    def refresh_device_status(self):
-        # Отображение окна прогресса
-        progress_dialog = QProgressDialog("Checking device status...", "Cancel", 0, len(self.device_checkboxes), self)
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.setMinimumWidth(300)
-        progress_dialog.show()
-        
-        for i, checkbox in enumerate(self.device_checkboxes):
-            if progress_dialog.wasCanceled():
-                break
-            progress_dialog.setValue(i)
-            progress_dialog.setLabelText(f"Checking {checkbox.text()}...")
-            QApplication.processEvents()  # Обновление UI
-            
-            # Проверка статуса устройства
-            if self.is_device_connected(checkbox.text()):
-                self.update_device_status_ui(checkbox, "connected")
+    def refresh_device_list(self):
+        device_status, active_devices = self.get_device_status()
+        self.update_device_grid(active_devices)
+        for checkbox in self.device_checkboxes:
+            device_name = checkbox.text()
+            if device_name in device_status:
+                self.update_device_status_ui(checkbox, device_status[device_name])
             else:
                 self.update_device_status_ui(checkbox, "disconnected")
-        
-        progress_dialog.setValue(len(self.device_checkboxes))
+    
+    def get_device_status(self):
+        device_status = {}
+        active_devices = []
+        result = subprocess.run(['adb', 'devices', '-l'], stdout=subprocess.PIPE).stdout.decode('utf-8')
+        lines = result.split('\n')
+        for line in lines[1:]:
+            if line.strip():
+                parts = line.split()
+                device_name = parts[0]
+                device_state = parts[1]
+                device_status[device_name] = device_state
+                active_devices.append(device_name)
+        return device_status, active_devices
+    
+    def update_device_grid(self, active_devices):
+        existing_devices = [cb.text() for cb in self.device_checkboxes]
+        for device in active_devices:
+            if device not in existing_devices:
+                checkbox = QCheckBox(device)
+                self.device_checkboxes.append(checkbox)
+                row, col = divmod(len(self.device_checkboxes) - 1, 4)
+                self.devices_grid.addWidget(checkbox, row, col)
+    
+    def update_device_status_ui(self, checkbox, status):
+        palette = QPalette()
+        if status == "device":
+            palette.setColor(QPalette.Active, QPalette.WindowText, QColor('green'))
+        elif status == "offline":
+            palette.setColor(QPalette.Active, QPalette.WindowText, QColor('red'))
+        else:
+            palette.setColor(QPalette.Active, QPalette.WindowText, QColor('black'))
+        checkbox.setPalette(palette)
     
     def check_device_status(self):
         for checkbox in self.device_checkboxes:
@@ -73,96 +86,102 @@ class ControlTab(QWidget):
             else:
                 self.update_device_status_ui(checkbox, "disconnected")
     
-    def update_device_status_ui(self, checkbox, status):
-        palette = QPalette()
-        if status == "connected":
-            palette.setColor(QPalette.Active, QPalette.WindowText, QColor('green'))
-        else:
-            palette.setColor(QPalette.Active, QPalette.WindowText, QColor('red'))
-        checkbox.setPalette(palette)
-    
-    def is_device_connected(self, device):
-        # Настройка STARTUPINFO для скрытия окна командной строки
+    @staticmethod
+    def is_device_connected(device):
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        
-        # Запуск процесса без отображения окна командной строки
         result = subprocess.run(['adb', 'devices'], capture_output=True, text=True, startupinfo=startupinfo)
         return device in result.stdout
     
     def create_group(self, title, layout):
-        """Create a UI group with a given title and layout."""
         group = QGroupBox(title)
         group.setLayout(layout)
         return group
     
     def devices_ui(self):
-        """Create and configure UI for device management."""
         layout = QVBoxLayout()
         self.devices.sort()
         self.devices_grid = QGridLayout()
         self.device_checkboxes = [QCheckBox(device) for device in self.devices]
-        
-        num_rows = (len(self.device_checkboxes) + 3) // 4  # Ceiling division
-        
-        # Distribute checkboxes across the grid.
         for index, checkbox in enumerate(self.device_checkboxes):
-            col = index // num_rows
-            row = index % num_rows
+            row, col = divmod(index, 4)
             self.devices_grid.addWidget(checkbox, row, col)
-        
         layout.addLayout(self.devices_grid)
         
-        # Create and add first row of control buttons.
-        first_row_buttons = [
-            ("Select All", self.select_all_devices),
-            ("Add Device", self.add_device),
-            ("Delete Device", self.delete_device)
-        ]
-        first_row_button_layout = self.create_button_layout(first_row_buttons, add_stretch=False)
-        layout.addLayout(first_row_button_layout)
+        # Adding Select All, Connect, and Disconnect buttons
+        button_layout = QHBoxLayout()
         
-        # Create and add second row of control buttons with space between them.
-        second_row_buttons = [
-            ("Connect", self.connect_devices),
-            ("Scrcpy", self.connect_via_scrcpy),
-            ("Disconnect", self.disconnect_devices)
-        ]
-        second_row_button_layout = self.create_button_layout(second_row_buttons, add_stretch=True)
+        select_all_button = QPushButton('Select All')
+        select_all_button.clicked.connect(self.select_all_devices)
+        button_layout.addWidget(select_all_button)
         
-        layout.addLayout(first_row_button_layout)
-        layout.addLayout(second_row_button_layout)
+        connect_button = QPushButton('Connect')
+        connect_button.clicked.connect(self.connect_devices)
+        button_layout.addWidget(connect_button)
         
-        self.apply_standard_margins_and_spacing(layout)
-        return layout
-    
-    def commands_ui(self):
-        """Create and configure UI for command management."""
-        layout = QVBoxLayout()
-        self.command_combobox = QComboBox()
-        self.command_combobox.setEditable(False)
-        self.command_combobox.addItems(self.commands)
-        self.command_combobox.setCurrentIndex(-1)
+        disconnect_button = QPushButton('Disconnect')
+        disconnect_button.clicked.connect(self.disconnect_devices)
+        button_layout.addWidget(disconnect_button)
         
-        # Установка политики размера для растягивания комбобокса
-        self.command_combobox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        
-        layout.addWidget(self.command_combobox)
-        
-        # Create and add control buttons.
-        buttons = [
-            ("Execute", self.execute_adb_command_method),
-            ("Add Command", self.add_command),
-            ("Delete Command", self.delete_command)
-        ]
-        button_layout = self.create_button_layout(buttons)
         layout.addLayout(button_layout)
         
         self.apply_standard_margins_and_spacing(layout)
         return layout
     
+    def commands_ui(self):
+        layout = QVBoxLayout()
+        self.command_combobox = QComboBox()
+        self.command_combobox.setEditable(False)
+        self.command_combobox.addItems(self.commands)
+        self.command_combobox.setCurrentIndex(-1)
+        self.command_combobox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        layout.addWidget(self.command_combobox)
+        
+        # Creating buttons in a horizontal layout
+        button_layout = QHBoxLayout()
+        
+        execute_button = QPushButton('Execute')
+        execute_button.clicked.connect(self.execute_adb_command_method)
+        button_layout.addWidget(execute_button)
+        
+        add_command_button = QPushButton('Add Command')
+        add_command_button.clicked.connect(self.add_command)
+        button_layout.addWidget(add_command_button)
+        
+        delete_command_button = QPushButton('Delete Command')
+        delete_command_button.clicked.connect(self.delete_command)
+        button_layout.addWidget(delete_command_button)
+        
+        layout.addLayout(button_layout)
+        
+        self.apply_standard_margins_and_spacing(layout)
+        return layout
+    
+    def add_command(self):
+        dialog = QInputDialog(self)
+        dialog.setInputMode(QInputDialog.TextInput)
+        dialog.setLabelText("Enter ADB Command:")
+        dialog.setWindowTitle("Add Command")
+        dialog.resize(400, 200)
+        
+        ok = dialog.exec_()
+        text = dialog.textValue()
+        
+        if ok and text:
+            self.commands.append(text)
+            self.command_combobox.addItem(text)
+            DataManager.save_data(self.devices, self.commands)
+    
+    def delete_command(self):
+        dialog = DeleteCommandDialog(self.commands, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            commands_to_delete = dialog.get_selected_commands()
+            self.commands = [cmd for cmd in self.commands if cmd not in commands_to_delete]
+            self.command_combobox.clear()
+            self.command_combobox.addItems(self.commands)
+            DataManager.save_data(self.devices, self.commands)
+    
     def output_ui(self):
-        """Create and configure UI for output display."""
         layout = QVBoxLayout()
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
@@ -171,69 +190,24 @@ class ControlTab(QWidget):
         return layout
     
     def create_button_layout(self, buttons, add_stretch=False):
-        """Create a button layout based on a list of pairs (button text, callback function)."""
         button_layout = QHBoxLayout()
+        if add_stretch:
+            button_layout.addStretch(1)
         for text, callback in buttons:
             button = self.create_button(text, callback)
             button_layout.addWidget(button)
-            
-            if add_stretch and text == "Connect":
-                button_layout.addStretch(1)
-        
         if not add_stretch:
             button_layout.addStretch(1)
-        
         return button_layout
     
     def create_button(self, text, callback):
-        """Create a button with specified text and callback function."""
         button = QPushButton(text)
         button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         button.clicked.connect(callback)
         return button
     
-    def create_button_layout(self, buttons, add_stretch=False):
-        """Создать макет для кнопок на основе списка пар (текст кнопки, функция обратного вызова)."""
-        button_layout = QHBoxLayout()
-        if add_stretch:
-            button_layout.addStretch(1)  # Добавить растягиваемое пространство перед первой кнопкой
-        
-        for text, callback in buttons:
-            button = self.create_button(text, callback)
-            button_layout.addWidget(button)
-            
-            if text == "Connect":
-                button_layout.addSpacing(10)
-        
-        if add_stretch:
-            button_layout.addStretch(1)
-        
-        return button_layout
-    
     def apply_standard_margins_and_spacing(self, layout):
-        """
-        Apply standard spacing between widgets in the layout.
-
-        :param layout: The layout to which the spacing is applied.
-        """
         layout.setSpacing(10)
-    
-    def add_device(self):
-        """
-        Add a new device by IP and Port after validating the input.
-        If the input format is wrong, show a warning message.
-        """
-        text, ok = QInputDialog.getText(self, "Add Device", "Enter IP and Port (format: IP:Port):")
-        if ok and text:
-            try:
-                ip, port = text.split(":")
-                # ... код для добавления устройства ...
-                self.devices.append(f"{ip}:{port}")
-                self.update_device_grid(self.devices)
-                DataManager.save_data(self.devices, self.commands)
-                self.check_device_status()  # Обновление статуса устройства
-            except ValueError:
-                QMessageBox.warning(self, "Invalid input", "Please use format: IP:Port.")
     
     def connect_devices(self):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -263,39 +237,12 @@ class ControlTab(QWidget):
                 self.output_text.append(f"ERROR connecting {device}: {str(e)}\n")
         
         progress_dialog.setValue(len(selected_devices))
-        progress_dialog.setLabelText("Connection complete. Click 'Ok' to exit.")
-        progress_dialog.setCancelButtonText("Ok")
-        progress_dialog.canceled.connect(progress_dialog.close)
+        progress_dialog.close()
         self.output_text.append(f"<strong>Total connection time</strong>: {total_execution_time} seconds\n")
         self.output_text.append("<strong>-</strong>" * 120 + "\n")
         
         self.check_device_status()
     
-    def connect_via_scrcpy(self):
-        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
-        if not selected_devices:
-            QMessageBox.warning(self, "Warning", "Please select at least one device to connect via Scrcpy.")
-            return
-        
-        for device in selected_devices:
-            command = f"C:/adb/scrcpy.exe --tcpip={device}"
-            try:
-                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                self.scrcpy_processes[device] = process
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"An exception occurred: {e}")
-    
-    def terminate_scrcpy_process(self, device):
-        process = self.scrcpy_processes.get(device)
-        if process:
-            process.terminate()
-            process.wait()
-            del self.scrcpy_processes[device]
-    
-    def closeEvent(self, event):
-        for device in list(self.scrcpy_processes):
-            self.terminate_scrcpy_process(device)
-        event.accept()
     
     def disconnect_devices(self):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -325,9 +272,7 @@ class ControlTab(QWidget):
                 self.output_text.append(f"ERROR disconnecting {device}: {str(e)}\n")
         
         progress_dialog.setValue(len(selected_devices))
-        progress_dialog.setLabelText("Disconnection complete. Click 'Ok' to exit.")
-        progress_dialog.setCancelButtonText("Ok")
-        progress_dialog.canceled.connect(progress_dialog.close)
+        progress_dialog.close()
         self.output_text.append(f"<strong>Total disconnection time</strong>: {total_execution_time} seconds\n")
         self.output_text.append("<strong>-</strong>" * 120 + "\n")
         
@@ -368,9 +313,9 @@ class ControlTab(QWidget):
                 self.output_text.append(f"ERROR executing on {device}: {str(e)}\n")
         
         progress_dialog.setValue(len(selected_devices))
-        progress_dialog.setLabelText("Execution complete. Click 'Ok' to exit.")
-        progress_dialog.setCancelButtonText("Ok")
-        progress_dialog.canceled.connect(progress_dialog.close)
+        
+        progress_dialog.close()
+        
         self.output_text.append(f"<strong>Total execution time:</strong> {total_execution_time} seconds\n")
         self.output_text.append("<strong>-</strong>" * 120 + "\n")
     
@@ -405,19 +350,6 @@ class ControlTab(QWidget):
             remove_device_combo_box.addItems(devices)
             remove_device_combo_box.setCurrentIndex(-1)
     
-    def delete_device(self):
-        """
-        Open a dialog for the user to select and delete devices.
-        Update the device grid upon deletion.
-        """
-        dialog = DeleteDeviceDialog(self.devices, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
-            devices_to_delete = dialog.get_selected_devices()
-            self.devices = [dev for dev in self.devices if dev not in devices_to_delete]
-            self.update_device_grid(self.devices)
-            DataManager.save_data(self.devices, self.commands)
-            self.check_device_status()  # Обновление статуса устройства
-    
     def select_all_devices(self):
         """
         Toggles the selection of all device checkboxes. If all are selected,
@@ -426,118 +358,7 @@ class ControlTab(QWidget):
         all_selected = all(cb.isChecked() for cb in self.device_checkboxes)
         for checkbox in self.device_checkboxes:
             checkbox.setChecked(not all_selected)
-    
-    def add_command(self):
-        """
-        Open a dialog to add a new ADB command.
-        Add the command to the combobox and commands list if the input is valid.
-        """
-        dialog = QInputDialog(self)
-        dialog.setInputMode(QInputDialog.TextInput)
-        dialog.setLabelText("Enter ADB Command:")
-        dialog.setWindowTitle("Add Command")
-        dialog.resize(400, 200)
-        
-        ok = dialog.exec_()
-        text = dialog.textValue()
-        
-        if ok and text:
-            self.commands.append(text)
-            self.command_combobox.addItem(text)
             
-            DataManager.save_data(self.devices,self.commands)
-    
-    def delete_command(self):
-        """
-        Open a dialog for the user to select and delete ADB commands.
-        Update the command combobox upon deletion.
-        """
-        dialog = DeleteCommandDialog(self.commands, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
-            commands_to_delete = dialog.get_selected_commands()
-            self.commands = [cmd for cmd in self.commands if cmd not in commands_to_delete]
-            self.command_combobox.clear()
-            self.command_combobox.addItems(self.commands)
-            
-            DataManager.save_data(self.devices,self.commands)
-
-
-class DeleteDeviceDialog(QDialog):
-    def __init__(self, devices, parent=None):
-        """
-        Initialize the DeleteDeviceDialog.
-
-        :param devices: a list of device names.
-        :param parent: parent widget.
-        """
-        super().__init__(parent)
-        self.setWindowTitle("Delete Devices")
-
-        self.devices = devices
-        self.checkboxes = []
-
-        layout = QVBoxLayout(self)
-
-        self.setup_devices_layout(layout)
-        self.setup_buttons(layout)
-
-        self.setLayout(layout)
-        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
-
-    def setup_devices_layout(self, parent_layout):
-        """
-        Set up the layout for device checkboxes.
-
-        :param parent_layout: layout to which device layout is added.
-        """
-        devices_layout = QGridLayout()
-        self.checkboxes = [QCheckBox(device) for device in self.devices]
-
-        num_rows = len(self.checkboxes) // 4 + (len(self.checkboxes) % 4 != 0)
-
-        for index, checkbox in enumerate(self.checkboxes):
-            col = index // num_rows
-            row = index % num_rows
-            devices_layout.addWidget(checkbox, row, col)
-
-        parent_layout.addLayout(devices_layout)
-
-    def setup_buttons(self, parent_layout):
-        """
-        Set up the dialog buttons.
-
-        :param parent_layout: layout to which buttons are added.
-        """
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-
-        select_all_button = QPushButton("Select All")
-        select_all_button.clicked.connect(self.select_all_devices)
-
-        buttons_layout = QVBoxLayout()
-        buttons_layout.addWidget(select_all_button)
-        buttons_layout.addWidget(button_box)
-
-        parent_layout.addLayout(buttons_layout)
-
-    def select_all_devices(self):
-        """
-        Check or uncheck all device checkboxes based on the current state.
-        """
-        all_selected = all(checkbox.isChecked() for checkbox in self.checkboxes)
-
-        for checkbox in self.checkboxes:
-            checkbox.setChecked(not all_selected)
-
-    def get_selected_devices(self):
-        """
-        Get all selected devices.
-
-        :return: a list of selected device names.
-        """
-        return [cb.text() for cb in self.checkboxes if cb.isChecked()]
-
 
 class DeleteCommandDialog(QDialog):
     def __init__(self, commands, parent=None):

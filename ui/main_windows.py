@@ -20,12 +20,14 @@ class ADBController(QWidget):
         Initialize the ADBController widget.
         """
         super().__init__()
-
+        
         self.devices, self.commands = DataManager.load_data()
         self.tab_control = ControlTab(self.devices, self.commands)
 
         self.init_ui()
-
+        
+        self.tab_control.refresh_device_list()  # Refresh device list at startup
+    
     def init_ui(self):
         """
         Initialize the UI components.
