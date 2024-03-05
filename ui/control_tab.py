@@ -1,8 +1,9 @@
 import subprocess
 from datetime import datetime
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QFontMetrics, QPalette, QColor
+
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFontMetrics, QPalette, QColor
+from PyQt5.QtWidgets import *
 
 from utils.adb_executor import execute_adb_command
 from utils.data_management import DataManager
@@ -43,7 +44,7 @@ class ControlTab(QWidget):
             if device_name in device_status:
                 self.update_device_status_ui(checkbox, device_status[device_name])
             else:
-                self.update_device_status_ui(checkbox, "disconnected")
+                self.update_device_status_ui(checkbox, "offline")
     
     def get_device_status(self):
         device_status = {}
@@ -82,9 +83,9 @@ class ControlTab(QWidget):
         for checkbox in self.device_checkboxes:
             device = checkbox.text()
             if self.is_device_connected(device):
-                self.update_device_status_ui(checkbox, "connected")
+                self.update_device_status_ui(checkbox, "device")
             else:
-                self.update_device_status_ui(checkbox, "disconnected")
+                self.update_device_status_ui(checkbox, "offline")
     
     @staticmethod
     def is_device_connected(device):
@@ -189,23 +190,6 @@ class ControlTab(QWidget):
         self.apply_standard_margins_and_spacing(layout)
         return layout
     
-    def create_button_layout(self, buttons, add_stretch=False):
-        button_layout = QHBoxLayout()
-        if add_stretch:
-            button_layout.addStretch(1)
-        for text, callback in buttons:
-            button = self.create_button(text, callback)
-            button_layout.addWidget(button)
-        if not add_stretch:
-            button_layout.addStretch(1)
-        return button_layout
-    
-    def create_button(self, text, callback):
-        button = QPushButton(text)
-        button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        button.clicked.connect(callback)
-        return button
-    
     def apply_standard_margins_and_spacing(self, layout):
         layout.setSpacing(10)
     
@@ -243,7 +227,6 @@ class ControlTab(QWidget):
         
         self.check_device_status()
     
-    
     def disconnect_devices(self):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.output_text.append(f"<strong>DISCONNECT COMMAND</strong>: {current_time}\n")
@@ -279,10 +262,7 @@ class ControlTab(QWidget):
         self.check_device_status()  # Обновление статуса устройства после попытки отключения
     
     def execute_adb_command_method(self):
-        """
-        Execute the selected ADB command on the selected devices.
-        Append the output and any errors to the output_text QTextEdit.
-        """
+        
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.output_text.append(f"<strong>NEW COMMAND</strong>: {current_time}\n")
         
@@ -319,37 +299,6 @@ class ControlTab(QWidget):
         self.output_text.append(f"<strong>Total execution time:</strong> {total_execution_time} seconds\n")
         self.output_text.append("<strong>-</strong>" * 120 + "\n")
     
-    def update_device_grid(self, devices, remove_device_combo_box=None):
-        """
-        Update the grid layout which shows devices checkboxes.
-
-        :param devices: List of devices to be shown on the grid.
-        :param remove_device_combo_box: (Optional) QComboBox that might need updating with the new device list.
-        """
-        # Clearing existing widgets in the layout.
-        for i in reversed(range(self.devices_grid.count())):
-            widget_to_remove = self.devices_grid.itemAt(i).widget()
-            self.devices_grid.removeWidget(widget_to_remove)
-            widget_to_remove.setParent(None)
-            widget_to_remove.deleteLater()
-        
-        devices.sort()
-        self.device_checkboxes = [QCheckBox(device) for device in devices]
-        
-        num_rows = len(self.device_checkboxes) // 4 + (len(self.device_checkboxes) % 4 != 0)
-        
-        # Adding checkboxes to the layout.
-        for index, checkbox in enumerate(self.device_checkboxes):
-            col = index // num_rows
-            row = index % num_rows
-            self.devices_grid.addWidget(checkbox, row, col)
-        
-        # Updating the remove_device_combo_box if provided.
-        if remove_device_combo_box:
-            remove_device_combo_box.clear()
-            remove_device_combo_box.addItems(devices)
-            remove_device_combo_box.setCurrentIndex(-1)
-    
     def select_all_devices(self):
         """
         Toggles the selection of all device checkboxes. If all are selected,
@@ -358,7 +307,7 @@ class ControlTab(QWidget):
         all_selected = all(cb.isChecked() for cb in self.device_checkboxes)
         for checkbox in self.device_checkboxes:
             checkbox.setChecked(not all_selected)
-            
+
 
 class DeleteCommandDialog(QDialog):
     def __init__(self, commands, parent=None):
