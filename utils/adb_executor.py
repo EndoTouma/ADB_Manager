@@ -2,7 +2,7 @@ import subprocess
 import time
 
 import chardet
-from PyQt5.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QMessageBox
 
 
 def decode_output(output_bytes):
@@ -24,7 +24,11 @@ def execute_adb_command(device, command, output_text_widget):
         
         start_time = time.time()
         
-        process = subprocess.Popen(adb_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        # Установка флага creationflags для скрытия окна командной строки
+        process = subprocess.Popen(
+            adb_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
         output, error = process.communicate()
         
         end_time = time.time()
@@ -35,13 +39,11 @@ def execute_adb_command(device, command, output_text_widget):
     
     except Exception as e:
         error_dialog = QMessageBox()
-        error_dialog.setIcon(QMessageBox.Critical)
+        error_dialog.setIcon(QMessageBox.Icon.Critical)
         error_dialog.setWindowTitle("Error")
         error_dialog.setText("An error occurred while attempting to execute the ADB command.")
         error_dialog.setInformativeText(str(e))
-        error_dialog.addButton(QMessageBox.Ok)
+        error_dialog.addButton(QMessageBox.StandardButton.Ok)
         error_dialog.exec()
     
     return execution_time
-
-
