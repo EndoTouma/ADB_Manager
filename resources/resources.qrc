@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>adb.ico</file>
+    </qresource>
+</RCC>
