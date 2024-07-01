@@ -1,6 +1,6 @@
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTextEdit, QGroupBox
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTextEdit, QGroupBox
 
 
 class AboutTab(QWidget):
@@ -47,7 +47,7 @@ class AboutTab(QWidget):
         description_group = self.create_group("Description", self.description_ui())
         layout_about.addWidget(description_group)
 
-        layout_about.setAlignment(Qt.AlignTop)
+        layout_about.setAlignment(Qt.AlignmentFlag.AlignTop)
 
     def create_group(self, title, layout):
         """
@@ -99,8 +99,8 @@ class AboutTab(QWidget):
             layout.addWidget(label)
 
         horizontal_line = QFrame()
-        horizontal_line.setFrameShape(QFrame.HLine)
-        horizontal_line.setFrameShadow(QFrame.Sunken)
+        horizontal_line.setFrameShape(QFrame.Shape.HLine)
+        horizontal_line.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(horizontal_line)
 
         return layout
