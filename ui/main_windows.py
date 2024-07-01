@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
+from PyQt6.QtGui import QIcon
 
 from ui.about_tab import AboutTab
 from ui.control_tab import ControlTab
@@ -14,7 +15,7 @@ class ADBController(QWidget):
     """
     Main widget for the ADB Controller application.
     """
-
+    
     def __init__(self):
         """
         Initialize the ADBController widget.
@@ -23,7 +24,7 @@ class ADBController(QWidget):
         
         self.devices, self.commands = DataManager.load_data()
         self.tab_control = ControlTab(self.devices, self.commands)
-
+        
         self.init_ui()
         
         self.tab_control.refresh_device_list()  # Refresh device list at startup
@@ -34,12 +35,12 @@ class ADBController(QWidget):
         """
         layout = QVBoxLayout()
         tabs = QTabWidget()
-
+        
         # Tabs
         tab_about = AboutTab()
         tabs.addTab(self.tab_control, "Control")
         tabs.addTab(tab_about, "About")
-
+        
         # Layout setup
         layout.addWidget(tabs)
         self.setLayout(layout)
@@ -47,8 +48,9 @@ class ADBController(QWidget):
         self.setWindowTitle("ADB Controller")
         self.setGeometry(WINDOW_X_POS, WINDOW_Y_POS, WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+        self.setWindowIcon(QIcon('resources/adb.ico'))  # Установка иконки окна
         self.show()
-
+    
     def save_data_method(self):
         """
         Save the data using the DataManager.
