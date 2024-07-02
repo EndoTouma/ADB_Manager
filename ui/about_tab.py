@@ -4,12 +4,10 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTextEdit, QGr
 
 
 class AboutTab(QWidget):
-    """
-    A tab widget that displays information about the application.
-    """
+    
     APP_INFO_LABELS = [
         ("ADB Controller", 12, True),
-        ("Version: 1.5", 9, False),
+        ("Version: 2.0.0-rc.1", 9, False),
         ("Author: Eugene Vervai", 9, False),
         ("Contact: delspin1@gmail.com", 9, False),
         ("License: MIT License", 9, False)
@@ -36,9 +34,7 @@ class AboutTab(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        """
-        Initialize UI components.
-        """
+        
         layout_about = QVBoxLayout(self)
 
         app_info_group = self.create_group("App Information", self.app_info_ui())
@@ -50,16 +46,7 @@ class AboutTab(QWidget):
         layout_about.setAlignment(Qt.AlignmentFlag.AlignTop)
 
     def create_group(self, title, layout):
-        """
-        Create a QGroupBox with a specified title and layout.
 
-        Parameters:
-            title (str): The title of the group box.
-            layout (QLayout): The layout to set on the group box.
-
-        Returns:
-            QGroupBox: The configured group box.
-        """
         group = QGroupBox(title)
         group.setLayout(layout)
         layout.setSpacing(10)  # Consistent spacing
@@ -67,17 +54,7 @@ class AboutTab(QWidget):
         return group
 
     def create_label(self, text, size, bold):
-        """
-        Create a QLabel with specified text and font properties.
 
-        Parameters:
-            text (str): The text of the label.
-            size (int): The size of the font.
-            bold (bool): Bold font flag.
-
-        Returns:
-            QLabel: The configured label.
-        """
         label = QLabel(text)
         font = QFont()
         font.setPointSize(size)
@@ -86,12 +63,7 @@ class AboutTab(QWidget):
         return label
 
     def app_info_ui(self):
-        """
-        Create a layout with application information labels.
 
-        Returns:
-            QVBoxLayout: The layout containing app info labels.
-        """
         layout = QVBoxLayout()
 
         for text, size, bold in self.APP_INFO_LABELS:
@@ -106,12 +78,7 @@ class AboutTab(QWidget):
         return layout
 
     def description_ui(self):
-        """
-        Create a layout with a description QTextEdit widget.
 
-        Returns:
-            QVBoxLayout: The layout containing the description text.
-        """
         layout = QVBoxLayout()
 
         description_text = QTextEdit()

@@ -24,7 +24,6 @@ def execute_adb_command(device, command, output_text_widget):
         
         start_time = time.time()
         
-        # Установка флага creationflags для скрытия окна командной строки
         process = subprocess.Popen(
             adb_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True,
             creationflags=subprocess.CREATE_NO_WINDOW

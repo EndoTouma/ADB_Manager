@@ -28,7 +28,7 @@ class LogcatThread(QThread):
             ['adb', '-s', self.device, 'logcat', f'*:{self.log_level}'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NO_WINDOW  # Скрытие окна командной строки
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
         if self.output_file:
             with open(self.output_file, 'w') as file:
@@ -247,9 +247,6 @@ class LogHighlighter(QSyntaxHighlighter):
         timestamp_format = QTextCharFormat()
         self.highlighting_rules.append((QRegularExpression("\\b\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\b"), timestamp_format))
 
-        # pid_tid_format = QTextCharFormat()
-        # self.highlighting_rules.append((QRegularExpression("\\b\\d+\\b(?=\\s)"), pid_tid_format))
-
         log_level_format = QTextCharFormat()
         log_levels = ["D", "I", "W", "E", "F", "V"]
         for level in log_levels:
@@ -466,7 +463,7 @@ class ControlTab(QWidget):
         self.output_text.setReadOnly(True)
         layout.addWidget(self.output_text)
         
-        self.highlighter = LogHighlighter(self.output_text.document())  # Добавьте эту строку для подсветки синтаксиса
+        self.highlighter = LogHighlighter(self.output_text.document())
         
         search_button = QPushButton("Search")
         search_button.clicked.connect(self.open_log_viewer)
@@ -553,7 +550,7 @@ class ControlTab(QWidget):
         }
         level, ok = QInputDialog.getItem(self, "Select Log Level", "Log Level:", levels, 0, False)
         if ok and level:
-            self.selected_log_level = level[0]  # Extract the first character which is the log level
+            self.selected_log_level = level[0]
             description = level_descriptions[self.selected_log_level]
             QMessageBox.information(self, "Log Level Description", description)
             callback()
@@ -579,20 +576,25 @@ class ControlTab(QWidget):
             QMessageBox.warning(self, "Warning", "Please select at least one device.")
             return
         
-        options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Logcat Output", "",
-                                                   "Text Files (*.txt);;All Files (*)",
-                                                   options=options)
-        if not file_path:
-            return
+        file_dialog = QFileDialog(self)
+        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        file_dialog.setNameFilter("Text Files (*.txt);;All Files (*)")
+        file_dialog.setDefaultSuffix("txt")
+        file_dialog.setWindowTitle("Save Logcat Output")
         
-        for device in selected_devices:
-            if device not in self.logcat_threads:
-                logcat_thread = LogcatThread(device, log_level=self.selected_log_level, output_file=file_path)
-                self.logcat_threads[device] = logcat_thread
-                logcat_thread.finished.connect(self.logcat_finished)
-                logcat_thread.start()
-                self.output_text.append(f"<strong>Started logcat to file for device: {device}</strong>\n")
+        if file_dialog.exec():
+            file_path = file_dialog.selectedFiles()[0]
+            if not file_path:
+                return
+            
+            for device in selected_devices:
+                if device not in self.logcat_threads:
+                    logcat_thread = LogcatThread(device, log_level="V",
+                                                 output_file=file_path)
+                    self.logcat_threads[device] = logcat_thread
+                    logcat_thread.finished.connect(self.logcat_finished)
+                    logcat_thread.start()
+                    self.output_text.append(f"<strong>Started logcat to file for device: {device}</strong>\n")
     
     def stop_logcat(self):
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
@@ -617,14 +619,14 @@ class ControlTab(QWidget):
         timestamp_formatted = f"<span style='font-weight:bold;color:#888888;'>{timestamp_date} {timestamp_time}</span>"
         pid_tid_formatted = f"<span style=color:#ff6e00;'>{pid} {tid}</span>"
         
-        color = '#a9b7c6'  # Default message color
-        if ' E ' in message:  # Error log
+        color = '#a9b7c6'
+        if ' E ' in message:
             color = '#cc7832'
-        elif ' W ' in message:  # Warning log
+        elif ' W ' in message:
             color = '#ffc66d'
-        elif ' I ' in message:  # Info log
+        elif ' I ' in message:
             color = '#6a8759'
-        elif ' D ' in message:  # Debug log
+        elif ' D ' in message:
             color = '#6897bb'
         
         self.output_text.append(
