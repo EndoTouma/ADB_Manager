@@ -579,20 +579,25 @@ class ControlTab(QWidget):
             QMessageBox.warning(self, "Warning", "Please select at least one device.")
             return
         
-        options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Logcat Output", "",
-                                                   "Text Files (*.txt);;All Files (*)",
-                                                   options=options)
-        if not file_path:
-            return
+        file_dialog = QFileDialog(self)
+        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        file_dialog.setNameFilter("Text Files (*.txt);;All Files (*)")
+        file_dialog.setDefaultSuffix("txt")
+        file_dialog.setWindowTitle("Save Logcat Output")
         
-        for device in selected_devices:
-            if device not in self.logcat_threads:
-                logcat_thread = LogcatThread(device, log_level=self.selected_log_level, output_file=file_path)
-                self.logcat_threads[device] = logcat_thread
-                logcat_thread.finished.connect(self.logcat_finished)
-                logcat_thread.start()
-                self.output_text.append(f"<strong>Started logcat to file for device: {device}</strong>\n")
+        if file_dialog.exec():
+            file_path = file_dialog.selectedFiles()[0]
+            if not file_path:
+                return
+            
+            for device in selected_devices:
+                if device not in self.logcat_threads:
+                    logcat_thread = LogcatThread(device, log_level="V",
+                                                 output_file=file_path)  # Уровень логов фиксирован на "V"
+                    self.logcat_threads[device] = logcat_thread
+                    logcat_thread.finished.connect(self.logcat_finished)
+                    logcat_thread.start()
+                    self.output_text.append(f"<strong>Started logcat to file for device: {device}</strong>\n")
     
     def stop_logcat(self):
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
