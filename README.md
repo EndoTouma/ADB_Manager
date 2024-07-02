@@ -11,7 +11,7 @@ The aim of ADB Controller is to provide a convenient, easy-to-use interface for 
 ### Requirements
 
 - Python 3.x
-- PyQt5
+- PyQt6
 - [Android Debug Bridge (ADB)](https://developer.android.com/studio/releases/platform-tools)
 
 ### Installation Steps
