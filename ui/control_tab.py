@@ -24,6 +24,7 @@ class LogcatThread(QThread):
         self.log_level = log_level
     
     def run(self):
+        
         process = subprocess.Popen(
             ['adb', '-s', self.device, 'logcat', f'*:{self.log_level}'],
             stdout=subprocess.PIPE,
