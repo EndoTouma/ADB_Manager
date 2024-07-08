@@ -10,7 +10,7 @@ from packaging import version
 class AboutTab(QWidget):
     APP_INFO_LABELS = [
         ("ADB Controller", 12, True),
-        ("Version: 2.0.0-rc.3", 9, False),
+        ("Version: 2.0.0-rc.5", 9, False),
         ("Author: Eugene Vervai", 9, False),
         ("Contact: delspin1@gmail.com", 9, False),
         ("License: MIT License", 9, False)
@@ -31,7 +31,7 @@ class AboutTab(QWidget):
         "ADB commands with ease."
     )
     
-    CURRENT_VERSION = "2.0.0-rc.3"  # текущая версия приложения
+    CURRENT_VERSION = "2.0.0-rc.5"  # текущая версия приложения
     REPO_API_URL = "https://api.github.com/repos/EndoTouma/ADB_Controller/releases/latest"
     
     def __init__(self):
@@ -121,7 +121,6 @@ class AboutTab(QWidget):
     
     def is_newer_version(self, latest_version):
         is_newer = version.parse(latest_version) > version.parse(self.CURRENT_VERSION)
-        print(f"Current version: {self.CURRENT_VERSION}, Latest version: {latest_version}, Is newer: {is_newer}")
         return is_newer
     
     def download_and_replace(self, url):
@@ -163,7 +162,6 @@ class UpdateCheckThread(QThread):
             latest_version = latest_release["tag_name"]
             
             is_newer = version.parse(latest_version) > version.parse(self.current_version)
-            print(f"Current version: {self.current_version}, Latest version: {latest_version}, Is newer: {is_newer}")
             
             if is_newer:
                 download_url = latest_release["assets"][0]["browser_download_url"]
