@@ -71,171 +71,139 @@ class LogViewerDialog(QDialog):
         self.update_button_states()
 
     def init_ui(self):
-        try:
-            layout = QVBoxLayout(self)
+        layout = QVBoxLayout(self)
 
-            self.log_viewer = QTextEdit(self)
-            self.log_viewer.setReadOnly(True)
-            self.log_viewer.setPlainText(self.log_text)
-            self.highlighter = LogHighlighter(self.log_viewer.document())
-            layout.addWidget(self.log_viewer)
+        self.log_viewer = QTextEdit(self)
+        self.log_viewer.setReadOnly(True)
+        self.log_viewer.setPlainText(self.log_text)
+        self.highlighter = LogHighlighter(self.log_viewer.document())
+        layout.addWidget(self.log_viewer)
 
-            search_layout = QHBoxLayout()
+        search_layout = QHBoxLayout()
 
-            self.search_input = QLineEdit(self)
-            self.search_input.setPlaceholderText("Search...")
-            self.search_input.textChanged.connect(self.update_button_states)
-            search_layout.addWidget(self.search_input)
+        self.search_input = QLineEdit(self)
+        self.search_input.setPlaceholderText("Search...")
+        self.search_input.textChanged.connect(self.update_button_states)
+        search_layout.addWidget(self.search_input)
 
-            self.search_button = QPushButton("Search")
-            self.search_button.clicked.connect(self.search_text)
-            search_layout.addWidget(self.search_button)
+        self.search_button = QPushButton("Search")
+        self.search_button.clicked.connect(self.search_text)
+        search_layout.addWidget(self.search_button)
 
-            self.filter_button = QPushButton("Filter")
-            self.filter_button.clicked.connect(self.filter_text)
-            search_layout.addWidget(self.filter_button)
+        self.filter_button = QPushButton("Filter")
+        self.filter_button.clicked.connect(self.filter_text)
+        search_layout.addWidget(self.filter_button)
 
-            self.clear_filter_button = QPushButton("Clear Filter")
-            self.clear_filter_button.clicked.connect(self.clear_filter)
-            search_layout.addWidget(self.clear_filter_button)
+        self.clear_filter_button = QPushButton("Clear Filter")
+        self.clear_filter_button.clicked.connect(self.clear_filter)
+        search_layout.addWidget(self.clear_filter_button)
 
-            self.next_button = QPushButton("Next")
-            self.next_button.clicked.connect(self.find_next)
-            search_layout.addWidget(self.next_button)
+        self.next_button = QPushButton("Next")
+        self.next_button.clicked.connect(self.find_next)
+        search_layout.addWidget(self.next_button)
 
-            self.prev_button = QPushButton("Previous")
-            self.prev_button.clicked.connect(self.find_prev)
-            search_layout.addWidget(self.prev_button)
+        self.prev_button = QPushButton("Previous")
+        self.prev_button.clicked.connect(self.find_prev)
+        search_layout.addWidget(self.prev_button)
 
-            layout.addLayout(search_layout)
-        except Exception as e:
-            logging.error(f'Error in init_ui: {e}', exc_info=True)
+        layout.addLayout(search_layout)
 
     def update_button_states(self):
-        try:
-            has_text = bool(self.search_input.text().strip())
-            self.search_button.setEnabled(has_text)
-            self.filter_button.setEnabled(has_text)
-            self.clear_filter_button.setEnabled(has_text)
-            self.next_button.setEnabled(False)
-            self.prev_button.setEnabled(False)
-        except Exception as e:
-            logging.error(f'Error in update_button_states: {e}', exc_info=True)
+        has_text = bool(self.search_input.text().strip())
+        self.search_button.setEnabled(has_text)
+        self.filter_button.setEnabled(has_text)
+        self.clear_filter_button.setEnabled(has_text)
+        self.next_button.setEnabled(False)
+        self.prev_button.setEnabled(False)
 
     def search_text(self):
-        try:
-            self.highlight_text = self.search_input.text().strip()
-            if not self.highlight_text:
-                logging.debug('Search input is empty.')
-                return
+        self.highlight_text = self.search_input.text().strip()
+        if not self.highlight_text:
+            logging.debug('Search input is empty.')
+            return
 
-            self.log_viewer.moveCursor(QTextCursor.MoveOperation.Start)
-            self.highlight_positions = []
-            self.current_highlight_index = -1
-            self.find_all()
-            if self.highlight_positions:
-                self.current_highlight_index = 0
-                self.move_cursor_to_highlight()
-                self.next_button.setEnabled(True)
-                self.prev_button.setEnabled(True)
-                logging.debug(f'Found positions: {self.highlight_positions}')
-            else:
-                logging.debug('No matches found.')
-        except Exception as e:
-            logging.error(f'Error in search_text: {e}', exc_info=True)
+        self.log_viewer.moveCursor(QTextCursor.MoveOperation.Start)
+        self.highlight_positions = []
+        self.current_highlight_index = -1
+        self.find_all()
+        if self.highlight_positions:
+            self.current_highlight_index = 0
+            self.move_cursor_to_highlight()
+            self.next_button.setEnabled(True)
+            self.prev_button.setEnabled(True)
+            logging.debug(f'Found positions: {self.highlight_positions}')
+        else:
+            logging.debug('No matches found.')
 
     def filter_text(self):
-        try:
-            search_text = self.search_input.text().strip()
-            if search_text:
-                self.filtered_log_text = '\n'.join(
-                    line for line in self.log_text.split('\n') if search_text in line)
-                self.log_viewer.setPlainText(self.filtered_log_text)
-            else:
-                self.log_viewer.setPlainText(self.log_text)
-        except Exception as e:
-            logging.error(f'Error in filter_text: {e}', exc_info=True)
+        search_text = self.search_input.text().strip()
+        if search_text:
+            self.filtered_log_text = '\n'.join(
+                line for line in self.log_text.split('\n') if search_text in line)
+            self.log_viewer.setPlainText(self.filtered_log_text)
+        else:
+            self.log_viewer.setPlainText(self.log_text)
 
     def clear_filter(self):
-        try:
-            self.log_viewer.setPlainText(self.log_text)
-            self.search_input.clear()
-            self.update_button_states()
-        except Exception as e:
-            logging.error(f'Error in clear_filter: {e}', exc_info=True)
+        self.log_viewer.setPlainText(self.log_text)
+        self.search_input.clear()
+        self.update_button_states()
 
     def find_all(self):
-        try:
-            self.highlight_positions = []
-            document = self.log_viewer.document()
-            cursor = QTextCursor(document)
+        self.highlight_positions = []
+        document = self.log_viewer.document()
+        cursor = QTextCursor(document)
 
-            while True:
-                cursor = document.find(self.highlight_text, cursor)
-                if cursor.isNull():
-                    break
-                self.highlight_positions.append(cursor.position())
+        while True:
+            cursor = document.find(self.highlight_text, cursor)
+            if cursor.isNull():
+                break
+            self.highlight_positions.append(cursor.position())
 
-            self.highlight_search_results()
-        except Exception as e:
-            logging.error(f'Error in find_all: {e}', exc_info=True)
+        self.highlight_search_results()
 
     def find_next(self):
-        try:
-            if not self.highlight_positions:
-                logging.debug('No highlight positions available for "Next".')
-                return
-            self.current_highlight_index = (self.current_highlight_index + 1) % len(self.highlight_positions)
-            self.move_cursor_to_highlight()
-        except Exception as e:
-            logging.error(f'Error in find_next: {e}', exc_info=True)
+        if not self.highlight_positions:
+            logging.debug('No highlight positions available for "Next".')
+            return
+        self.current_highlight_index = (self.current_highlight_index + 1) % len(self.highlight_positions)
+        self.move_cursor_to_highlight()
 
     def find_prev(self):
-        try:
-            if not self.highlight_positions:
-                logging.debug('No highlight positions available for "Previous".')
-                return
-            self.current_highlight_index = (self.current_highlight_index - 1) % len(self.highlight_positions)
-            self.move_cursor_to_highlight()
-        except Exception as e:
-            logging.error(f'Error in find_prev: {e}', exc_info=True)
+        if not self.highlight_positions:
+            logging.debug('No highlight positions available for "Previous".')
+            return
+        self.current_highlight_index = (self.current_highlight_index - 1) % len(self.highlight_positions)
+        self.move_cursor_to_highlight()
 
     def move_cursor_to_highlight(self):
-        try:
-            if not self.highlight_positions:
-                logging.debug('No highlight positions to move to.')
-                return
+        if not self.highlight_positions:
+            logging.debug('No highlight positions to move to.')
+            return
 
-            cursor = self.log_viewer.textCursor()
-            position = self.highlight_positions[self.current_highlight_index]
-            cursor.setPosition(position - len(self.highlight_text), QTextCursor.MoveMode.MoveAnchor)
-            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor,
-                                len(self.highlight_text))
-            self.log_viewer.setTextCursor(cursor)
-            self.log_viewer.ensureCursorVisible()
-        except Exception as e:
-            logging.error(f'Error in move_cursor_to_highlight: {e}', exc_info=True)
+        cursor = self.log_viewer.textCursor()
+        position = self.highlight_positions[self.current_highlight_index]
+        cursor.setPosition(position - len(self.highlight_text), QTextCursor.MoveMode.MoveAnchor)
+        cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, len(self.highlight_text))
+        self.log_viewer.setTextCursor(cursor)
+        self.log_viewer.ensureCursorVisible()
 
     def highlight_search_results(self):
-        try:
-            extra_selections = []
-            cursor = QTextCursor(self.log_viewer.document())
-            format = QTextCharFormat()
-            format.setBackground(QColor(Qt.GlobalColor.yellow))
+        extra_selections = []
+        cursor = QTextCursor(self.log_viewer.document())
+        format = QTextCharFormat()
+        format.setBackground(QColor(Qt.GlobalColor.yellow))
 
-            for pos in self.highlight_positions:
-                cursor.setPosition(pos - len(self.highlight_text), QTextCursor.MoveMode.MoveAnchor)
-                cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor,
-                                    len(self.highlight_text))
+        for pos in self.highlight_positions:
+            cursor.setPosition(pos - len(self.highlight_text), QTextCursor.MoveMode.MoveAnchor)
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, len(self.highlight_text))
 
-                extra_selection = QTextEdit.ExtraSelection()
-                extra_selection.cursor = cursor
-                extra_selection.format = format
-                extra_selections.append(extra_selection)
+            extra_selection = QTextEdit.ExtraSelection()
+            extra_selection.cursor = cursor
+            extra_selection.format = format
+            extra_selections.append(extra_selection)
 
-            self.log_viewer.setExtraSelections(extra_selections)
-        except Exception as e:
-            logging.error(f'Error in highlight_search_results: {e}', exc_info=True)
+        self.log_viewer.setExtraSelections(extra_selections)
 
 
 class LogHighlighter(QSyntaxHighlighter):
@@ -299,7 +267,7 @@ def create_group(title, layout):
 class ControlTab(QWidget):
     BUTTON_WIDTH = 150
     BUTTON_HEIGHT = 23
-    
+
     def __init__(self, devices, commands):
         super().__init__()
         self.selected_log_level = None
@@ -320,14 +288,17 @@ class ControlTab(QWidget):
         self.highlight_positions = []
         self.current_highlight_index = -1
         self.init_ui()
-        
+
+        self.update_device_grid(self.devices)
+        self.check_device_status()
+
         self.setAcceptDrops(True)
     
     def init_ui(self):
         layout_control = QVBoxLayout(self)
-        layout_control.addWidget(create_group("Available Devices", self.devices_ui()))
-        layout_control.addWidget(create_group("ADB Commands", self.commands_ui()))
-        layout_control.addWidget(create_group("Output", self.output_ui()))
+        layout_control.addWidget(self.create_group("Available Devices", self.devices_ui()))
+        layout_control.addWidget(self.create_group("ADB Commands", self.commands_ui()))
+        layout_control.addWidget(self.create_group("Output", self.output_ui()))
         
         self.logcat_button = QPushButton('Start Logcat')
         self.logcat_button.clicked.connect(self.select_log_level_for_logcat)
@@ -345,17 +316,49 @@ class ControlTab(QWidget):
         
         layout_control.addLayout(logcat_button_layout)
         
+        button_layout = QHBoxLayout()
+        
         self.clear_button = QPushButton('Clear Output', self)
         self.clear_button.clicked.connect(self.clear_output)
+        button_layout.addWidget(self.clear_button)
         
-        layout_control.addWidget(self.clear_button)
+        save_output_button = QPushButton('Save Output', self)
+        save_output_button.clicked.connect(self.save_output_to_file)
+        button_layout.addWidget(save_output_button)
         
-        self.check_device_status()
+        layout_control.addLayout(button_layout)
+        self.setLayout(layout_control)
     
+    def save_output_to_file(self):
+        file_dialog = QFileDialog(self)
+        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        file_dialog.setNameFilter("Text Files (*.txt);;All Files (*)")
+        file_dialog.setDefaultSuffix("txt")
+        file_dialog.setWindowTitle("Save Output")
+        
+        if file_dialog.exec():
+            file_path = file_dialog.selectedFiles()[0]
+            if not file_path:
+                return
+            
+            try:
+                with open(file_path, 'w') as file:
+                    file.write(self.output_text.toPlainText())
+                QMessageBox.information(self, "Success", "Output saved successfully!")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to save output: {str(e)}")
+    
+    @staticmethod
+    def create_group(title, content):
+        group = QGroupBox(title)
+        layout = QVBoxLayout(group)
+        layout.addLayout(content)
+        return group
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
-    
+
     def dropEvent(self, event):
         urls = event.mimeData().urls()
         if urls and urls[0].isLocalFile():
@@ -364,41 +367,68 @@ class ControlTab(QWidget):
                 current_text = self.command_combobox.currentText()
                 new_text = f"{current_text} {file_path}".strip()
                 self.command_combobox.setEditText(new_text)
-    
+
     def commands_ui(self):
         layout = QVBoxLayout()
         self.command_combobox = QComboBox()
-        self.command_combobox.setEditable(True)  # Позволяет вводить произвольные команды
+        self.command_combobox.setEditable(True)
         self.command_combobox.addItems(self.commands)
         self.command_combobox.setCurrentIndex(-1)
         self.command_combobox.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout.addWidget(self.command_combobox)
-        
+
         command_button_layout = QHBoxLayout()
-        
+
         execute_button = QPushButton('Execute')
         execute_button.clicked.connect(self.execute_adb_command_method)
         command_button_layout.addWidget(execute_button)
-        
+
         add_command_button = QPushButton('Add Command')
         add_command_button.clicked.connect(self.add_command)
         command_button_layout.addWidget(add_command_button)
-        
+
         delete_command_button = QPushButton('Delete Command')
         delete_command_button.clicked.connect(self.delete_command)
         command_button_layout.addWidget(delete_command_button)
-        
+
         plus_button = QPushButton("+")
         plus_button.setFixedWidth(30)
         plus_button.clicked.connect(self.handle_plus_button_click)
         command_button_layout.addWidget(plus_button)
-        
+
         layout.addLayout(command_button_layout)
         return layout
-    
+
+    def add_device(self):
+        text, ok = QInputDialog.getText(self, "Add Device", "Enter IP and Port (format: IP:Port):")
+        if ok and text:
+            try:
+                ip, port = text.split(":")
+                new_device = f"{ip}:{port}"
+                if new_device not in self.devices:
+                    self.devices.append(new_device)
+                    self.update_device_grid(self.devices)
+                    DataManager.save_data(self.devices, self.commands)
+                    self.check_device_status()
+                else:
+                    QMessageBox.warning(self, "Duplicate Device", "Device already exists.")
+            except ValueError:
+                QMessageBox.warning(self, "Invalid input", "Please use format: IP:Port.")
+
+    def delete_device(self):
+        device_status = {device: ("device" if self.is_device_connected(device) else "offline") for device in self.devices}
+        dialog = DeleteDeviceDialog(self.devices, device_status, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            devices_to_delete = dialog.get_selected_devices()
+            for device in devices_to_delete:
+                self.devices.remove(device)
+            self.update_device_grid(self.devices)
+            DataManager.save_data(self.devices, self.commands)
+            self.check_device_status()
+
     def handle_plus_button_click(self):
         self.select_file_for_install()
-    
+
     def select_file_for_install(self):
         file_dialog = QFileDialog(self)
         file_dialog.setNameFilter("APK Files (*.apk);;All Files (*)")
@@ -408,31 +438,31 @@ class ControlTab(QWidget):
             current_text = self.command_combobox.currentText()
             new_text = f"{current_text} {file_path}".strip()
             self.command_combobox.setEditText(new_text)
-    
+
     def uninstall_package(self, command):
         package_name, ok = QInputDialog.getText(self, 'Uninstall Package', 'Enter package name to uninstall:')
         if ok and package_name:
             self.command_combobox.setEditText(f"uninstall {package_name}")
-    
+
     def execute_apk_command(self, action, parameter, reinstall=False):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.output_text.append(f"<strong>{action.upper()} COMMAND</strong>: {current_time}\n")
-        
+
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
         if not selected_devices:
             QMessageBox.warning(self, "Warning", "Please select at least one device.")
             return
-        
+
         for device in selected_devices:
             thread = CommandThread(device, f"{action} {parameter}", reinstall)
             thread.command_output.connect(self.append_output)
             thread.command_finished.connect(self.command_finished)
             self.command_threads[device] = thread
             thread.start()
-    
+
     def append_output(self, output):
         self.output_text.append(output)
-    
+
     def command_finished(self, device, command, success):
         if success:
             self.output_text.append(f"<strong>COMMAND {command} finished for device: {device}</strong>\n")
@@ -440,80 +470,105 @@ class ControlTab(QWidget):
             self.output_text.append(f"<strong>COMMAND {command} failed for device: {device}</strong>\n")
         if device in self.command_threads:
             del self.command_threads[device]
-    
+
     def refresh_device_list(self):
         device_status, active_devices = get_device_status()
-        self.update_device_grid(active_devices)
+        self.update_device_grid(self.devices)
         for checkbox in self.device_checkboxes:
             device_name = checkbox.text()
             status = device_status.get(device_name, "offline")
             update_device_status_ui(checkbox, status)
-    
-    def update_device_grid(self, active_devices):
-        existing_devices = [cb.text() for cb in self.device_checkboxes]
-        for device in active_devices:
-            if device not in existing_devices:
-                checkbox = QCheckBox(device)
-                self.device_checkboxes.append(checkbox)
-                row, col = divmod(len(self.device_checkboxes) - 1, 4)
-                self.devices_grid.addWidget(checkbox, row, col)
-    
+
+    def update_device_grid(self, devices, remove_device_combo_box=None):
+        while self.devices_grid.count():
+            item = self.devices_grid.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        devices.sort()
+        self.device_checkboxes = [QCheckBox(device) for device in devices]
+
+        num_rows = len(self.device_checkboxes) // 4 + (len(self.device_checkboxes) % 4 != 0)
+
+        for index, checkbox in enumerate(self.device_checkboxes):
+            row = index // 4
+            col = index % 4
+            self.devices_grid.addWidget(checkbox, row, col)
+
+        if remove_device_combo_box:
+            remove_device_combo_box.clear()
+            remove_device_combo_box.addItems(devices)
+            remove_device_combo_box.setCurrentIndex(-1)
+
+        self.devices_grid.update()
+
     def check_device_status(self):
         for checkbox in self.device_checkboxes:
             device = checkbox.text()
             status = "device" if self.is_device_connected(device) else "offline"
             update_device_status_ui(checkbox, status)
-    
+        print(f"Device statuses updated: {[(cb.text(), cb.isChecked()) for cb in self.device_checkboxes]}")
+
     @staticmethod
     def is_device_connected(device):
         result = subprocess.run(['adb', 'devices'], capture_output=True, text=True)
         return device in result.stdout
-    
+
     def devices_ui(self):
         layout = QVBoxLayout()
         self.devices.sort()
         self.devices_grid = QGridLayout()
-        self.device_checkboxes = [QCheckBox(device) for device in self.devices]
-        for index, checkbox in enumerate(self.device_checkboxes):
-            row, col = divmod(index, 4)
-            self.devices_grid.addWidget(checkbox, row, col)
+        self.update_device_grid(self.devices)
         layout.addLayout(self.devices_grid)
-        
-        button_layout = QHBoxLayout()
-        select_all_button = QPushButton('Select All')
-        select_all_button.clicked.connect(self.select_all_devices)
-        button_layout.addWidget(select_all_button)
-        
+
+        first_row_button_layout = QHBoxLayout()
+        add_device_button = QPushButton('Add Device')
+        add_device_button.clicked.connect(self.add_device)
+        first_row_button_layout.addWidget(add_device_button)
+
+        delete_device_button = QPushButton('Delete Device')
+        delete_device_button.clicked.connect(self.delete_device)
+        first_row_button_layout.addWidget(delete_device_button)
+
         connect_button = QPushButton('Connect')
         connect_button.clicked.connect(self.connect_devices)
-        button_layout.addWidget(connect_button)
-        
+        first_row_button_layout.addWidget(connect_button)
+
         disconnect_button = QPushButton('Disconnect')
         disconnect_button.clicked.connect(self.disconnect_devices)
-        button_layout.addWidget(disconnect_button)
-        
+        first_row_button_layout.addWidget(disconnect_button)
+
+        layout.addLayout(first_row_button_layout)
+
+        second_row_button_layout = QHBoxLayout()
+        select_all_button = QPushButton('Select All')
+        select_all_button.clicked.connect(self.select_all_devices)
+        second_row_button_layout.addWidget(select_all_button)
+
         refresh_button = QPushButton('Refresh Status')
         refresh_button.clicked.connect(self.refresh_device_list)
-        button_layout.addWidget(refresh_button)
-        
-        layout.addLayout(button_layout)
+        second_row_button_layout.addWidget(refresh_button)
+
+        layout.addLayout(second_row_button_layout)
+
         return layout
-    
+
     def add_command(self):
         dialog = QInputDialog(self)
         dialog.setInputMode(QInputDialog.InputMode.TextInput)
         dialog.setLabelText("Enter ADB Command:")
         dialog.setWindowTitle("Add Command")
         dialog.resize(400, 200)
-        
+
         ok = dialog.exec()
         text = dialog.textValue()
-        
+
         if ok and text:
             self.commands.append(text)
             self.command_combobox.addItem(text)
             DataManager.save_data(self.devices, self.commands)
-    
+
     def delete_command(self):
         dialog = DeleteCommandDialog(self.commands, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -522,57 +577,56 @@ class ControlTab(QWidget):
             self.command_combobox.clear()
             self.command_combobox.addItems(self.commands)
             DataManager.save_data(self.devices, self.commands)
-    
+
     def output_ui(self):
         layout = QVBoxLayout()
-        
+
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
         layout.addWidget(self.output_text)
-        
+
         self.highlighter = LogHighlighter(self.output_text.document())
-        
+
         search_button = QPushButton("Search")
         search_button.clicked.connect(self.open_log_viewer)
         layout.addWidget(search_button)
-        
+
         return layout
-    
+
     def open_log_viewer(self):
         log_text = self.output_text.toPlainText()
         run_log_viewer(log_text)
-    
+
     def clear_output(self):
         self.output_text.clear()
         self.highlight_positions = []
         self.current_highlight_index = -1
-    
+
     def connect_devices(self):
         self.execute_device_command("connect")
-    
+
     def disconnect_devices(self):
         self.execute_device_command("disconnect")
-    
+
     def execute_adb_command_method(self):
         self.execute_device_command(self.command_combobox.currentText())
-    
+
     def execute_device_command(self, command):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.output_text.append(f"<strong>{command.upper()} COMMAND</strong>: {current_time}\n")
-        
+
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
         if not selected_devices:
             QMessageBox.warning(self, "Warning", "Please select at least one device.")
             return
-        
+
         total_execution_time = 0
-        progress_dialog = QProgressDialog(f"{command.capitalize()} devices...", "Cancel", 0, len(selected_devices),
-                                          self)
+        progress_dialog = QProgressDialog(f"{command.capitalize()} devices...", "Cancel", 0, len(selected_devices), self)
         progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         progress_dialog.setAutoClose(False)
         progress_dialog.setAutoReset(False)
         progress_dialog.setMinimumWidth(400)
-        
+
         for i, device in enumerate(selected_devices):
             if progress_dialog.wasCanceled():
                 break
@@ -583,28 +637,27 @@ class ControlTab(QWidget):
                 execution_time = execute_adb_command(device, command, self.output_text)
                 total_execution_time += execution_time
             except Exception as e:
-                self.output_text.append(
-                    f"<span style='color:red;'><strong>ERROR {command} {device}: {str(e)}</strong></span>\n")
-        
+                self.output_text.append(f"<span style='color:red;'><strong>ERROR {command} {device}: {str(e)}</strong></span>\n")
+
         progress_dialog.setValue(len(selected_devices))
         progress_dialog.close()
-        
+
         self.output_text.append(f"<strong>Total {command} time:</strong> {total_execution_time} seconds\n")
         self.output_text.append("<strong>-</strong>" * 120 + "\n")
-        
+
         self.check_device_status()
-    
+
     def select_all_devices(self):
         all_selected = all(cb.isChecked() for cb in self.device_checkboxes)
         for checkbox in self.device_checkboxes:
             checkbox.setChecked(not all_selected)
-    
+
     def select_log_level_for_logcat(self):
         self.log_level_dialog(self.start_logcat)
-    
+
     def select_log_level_for_logcat_to_file(self):
         self.log_level_dialog(self.start_logcat_to_file)
-    
+
     def log_level_dialog(self, callback):
         levels = ['V (Verbose)', 'D (Debug)', 'I (Info)', 'W (Warning)', 'E (Error)', 'F (Fatal)']
         level_descriptions = {
@@ -621,13 +674,13 @@ class ControlTab(QWidget):
             description = level_descriptions[self.selected_log_level]
             QMessageBox.information(self, "Log Level Description", description)
             callback()
-    
+
     def start_logcat(self):
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
         if not selected_devices:
             QMessageBox.warning(self, "Warning", "Please select at least one device.")
             return
-        
+
         for device in selected_devices:
             if device not in self.logcat_threads:
                 logcat_thread = LogcatThread(device, log_level=self.selected_log_level)
@@ -636,56 +689,55 @@ class ControlTab(QWidget):
                 self.logcat_threads[device] = logcat_thread
                 logcat_thread.start()
                 self.output_text.append(f"<strong>Started logcat for device: {device}</strong>\n")
-    
+
     def start_logcat_to_file(self):
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
         if not selected_devices:
             QMessageBox.warning(self, "Warning", "Please select at least one device.")
             return
-        
+
         file_dialog = QFileDialog(self)
         file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
         file_dialog.setNameFilter("Text Files (*.txt);;All Files (*)")
         file_dialog.setDefaultSuffix("txt")
         file_dialog.setWindowTitle("Save Logcat Output")
-        
+
         if file_dialog.exec():
             file_path = file_dialog.selectedFiles()[0]
             if not file_path:
                 return
-            
+
             for device in selected_devices:
                 if device not in self.logcat_threads:
-                    logcat_thread = LogcatThread(device, log_level="V",
-                                                 output_file=file_path)
+                    logcat_thread = LogcatThread(device, log_level="V", output_file=file_path)
                     self.logcat_threads[device] = logcat_thread
                     logcat_thread.finished.connect(self.logcat_finished)
                     logcat_thread.start()
                     self.output_text.append(f"<strong>Started logcat to file for device: {device}</strong>\n")
-    
+
     def stop_logcat(self):
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
         if not selected_devices:
             QMessageBox.warning(self, "Warning", "Please select at least one device.")
             return
-        
+
         for device in selected_devices:
             thread = self.logcat_threads.get(device)
             if thread:
                 thread.stop()
                 self.output_text.append(f"<strong>Stopped logcat for device: {device}</strong>\n")
-    
+
     def append_logcat_output(self, output):
         parts = output.split(' ', 4)
         if len(parts) < 5:
             self.output_text.append(f"<span style='color:blue;'>{output}</span>")
             return
-        
+
         timestamp_date, timestamp_time, pid, tid, message = parts[:5]
-        
+
         timestamp_formatted = f"<span style='font-weight:bold;color:#888888;'>{timestamp_date} {timestamp_time}</span>"
         pid_tid_formatted = f"<span style=color:#ff6e00;'>{pid} {tid}</span>"
-        
+
         color = '#a9b7c6'
         if ' E ' in message:
             color = '#cc7832'
@@ -695,10 +747,9 @@ class ControlTab(QWidget):
             color = '#6a8759'
         elif ' D ' in message:
             color = '#6897bb'
-        
-        self.output_text.append(
-            f"{timestamp_formatted} {pid_tid_formatted} <span style='color:{color};'>{message}</span>")
-    
+
+        self.output_text.append(f"{timestamp_formatted} {pid_tid_formatted} <span style='color:{color};'>{message}</span>")
+
     def logcat_finished(self, device):
         self.output_text.append(f"<strong>Logcat finished for device: {device}</strong>\n")
         if device in self.logcat_threads:
@@ -764,6 +815,37 @@ class DeleteCommandDialog(QDialog):
 
     def get_selected_commands(self):
         return [cb.text() for cb in self.checkboxes if cb.isChecked()]
+
+
+class DeleteDeviceDialog(QDialog):
+    def __init__(self, devices, device_statuses, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Delete Devices")
+        self.devices = devices
+        self.device_statuses = device_statuses
+        self.selected_devices = []
+
+        layout = QVBoxLayout(self)
+
+        self.checkboxes = []
+        for device in devices:
+            status = device_statuses.get(device)
+            checkbox = QCheckBox(device)
+            if status == "offline":
+                checkbox.setStyleSheet("color: red;")
+            else:
+                checkbox.setStyleSheet("color: green;")
+            self.checkboxes.append(checkbox)
+            layout.addWidget(checkbox)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        layout.addWidget(buttons)
+
+    def get_selected_devices(self):
+        return [checkbox.text() for checkbox in self.checkboxes if checkbox.isChecked()]
 
 
 class APKManager:
