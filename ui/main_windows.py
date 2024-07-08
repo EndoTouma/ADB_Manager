@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 
 from ui.about_tab import AboutTab
 from ui.control_tab import ControlTab
@@ -12,12 +12,12 @@ WINDOW_Y_POS = 100
 
 
 class ADBController(QWidget):
-
+    
     def __init__(self):
-
         super().__init__()
         
         self.devices, self.commands = DataManager.load_data()
+        
         self.tab_control = ControlTab(self.devices, self.commands)
         
         self.init_ui()
@@ -25,7 +25,6 @@ class ADBController(QWidget):
         self.tab_control.refresh_device_list()
     
     def init_ui(self):
-
         layout = QVBoxLayout()
         tabs = QTabWidget()
         
@@ -43,5 +42,4 @@ class ADBController(QWidget):
         self.show()
     
     def save_data_method(self):
-
         DataManager.save_data(self.devices, self.commands)
