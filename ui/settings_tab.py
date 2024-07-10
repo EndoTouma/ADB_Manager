@@ -11,7 +11,7 @@ from utils.data_management import DataManager
 
 
 class SettingsTab(QWidget):
-    CURRENT_VERSION = "2.0.0-rc.7"
+    CURRENT_VERSION = "2.0.0-rc.8"
     REPO_API_URL = "https://api.github.com/repos/EndoTouma/ADB_Controller/releases/latest"
     
     def __init__(self, devices, commands, theme, controller):
