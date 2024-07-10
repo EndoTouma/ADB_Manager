@@ -46,3 +46,13 @@ def execute_adb_command(device, command, output_text_widget):
         error_dialog.exec()
     
     return execution_time
+
+def execute_adb_commands(device, command):
+    try:
+        result = subprocess.run(['adb', '-s', device] + command.split(), capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout
+        else:
+            raise Exception(result.stderr)
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"Error executing command: {str(e)}")
