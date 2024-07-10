@@ -11,7 +11,7 @@ from utils.data_management import DataManager
 
 
 class SettingsTab(QWidget):
-    CURRENT_VERSION = "2.0.0-rc.9"
+    CURRENT_VERSION = "2.0.0-rc.10"
     REPO_API_URL = "https://api.github.com/repos/EndoTouma/ADB_Controller/releases/latest"
     
     def __init__(self, devices, commands, theme, controller):
@@ -131,23 +131,20 @@ class SettingsTab(QWidget):
     def replace_and_restart(self, new_file_path):
         try:
             app_path = sys.argv[0]
-            backup_path = app_path + ".bak"
+            old_path = app_path + ".old"
             # Backup the current executable
             if os.path.exists(app_path):
-                os.rename(app_path, backup_path)
+                os.rename(app_path, old_path)
             # Move the new file to the application path
             shutil.move(new_file_path, app_path)
-            # Remove the backup after the new file is in place
-            if os.path.exists(backup_path):
-                os.remove(backup_path)
             QMessageBox.information(self, "Update", "New version installed. The application will now restart.")
             QTimer.singleShot(0, lambda: QApplication.quit())
             QTimer.singleShot(1000, lambda: os.execl(sys.executable, sys.executable, *sys.argv))
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to replace the application file: {str(e)}")
             # If an error occurs, attempt to restore the backup
-            if os.path.exists(backup_path):
-                os.rename(backup_path, app_path)
+            if os.path.exists(old_path):
+                os.rename(old_path, app_path)
 
 
 class UpdateCheckThread(QThread):
@@ -201,7 +198,7 @@ class UpdateDownloadThread(QThread):
             
             total_length = int(total_length)
             downloaded = 0
-            new_file_path = sys.argv[0]
+            new_file_path = sys.argv[0] + ".new"
             
             with open(new_file_path, "wb") as file:
                 for data in response.iter_content(chunk_size=4096):
