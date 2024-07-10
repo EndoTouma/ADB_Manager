@@ -398,7 +398,7 @@ class ControlTab(QWidget):
 
         layout.addLayout(command_button_layout)
         return layout
-
+    
     def add_device(self):
         text, ok = QInputDialog.getText(self, "Add Device", "Enter IP and Port (format: IP:Port):")
         if ok and text:
@@ -407,25 +407,27 @@ class ControlTab(QWidget):
                 new_device = f"{ip}:{port}"
                 if new_device not in self.devices:
                     self.devices.append(new_device)
-                    self.update_device_grid(self.devices)
+                    self.update_device_grid()
                     DataManager.save_data(self.devices, self.commands)
                     self.check_device_status()
                 else:
                     QMessageBox.warning(self, "Duplicate Device", "Device already exists.")
             except ValueError:
                 QMessageBox.warning(self, "Invalid input", "Please use format: IP:Port.")
-
+    
     def delete_device(self):
-        device_status = {device: ("device" if self.is_device_connected(device) else "offline") for device in self.devices}
-        dialog = DeleteDeviceDialog(self.devices, device_status, parent=self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            devices_to_delete = dialog.get_selected_devices()
-            for device in devices_to_delete:
-                self.devices.remove(device)
-            self.update_device_grid(self.devices)
-            DataManager.save_data(self.devices, self.commands)
-            self.check_device_status()
-
+        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
+        if not selected_devices:
+            QMessageBox.warning(self, "Warning", "No device selected.")
+            return
+        
+        for device in selected_devices:
+            self.devices.remove(device)
+        
+        self.update_device_grid()
+        DataManager.save_data(self.devices, self.commands)
+        self.check_device_status()
+    
     def handle_plus_button_click(self):
         self.select_file_for_install()
 
@@ -470,46 +472,52 @@ class ControlTab(QWidget):
             self.output_text.append(f"<strong>COMMAND {command} failed for device: {device}</strong>\n")
         if device in self.command_threads:
             del self.command_threads[device]
-
+    
     def refresh_device_list(self):
         device_status, active_devices = get_device_status()
-        self.update_device_grid(self.devices)
+        self.update_device_grid(active_devices)
         for checkbox in self.device_checkboxes:
             device_name = checkbox.text()
             status = device_status.get(device_name, "offline")
             update_device_status_ui(checkbox, status)
-
-    def update_device_grid(self, devices, remove_device_combo_box=None):
+    
+    def update_device_grid(self, devices=None, remove_device_combo_box=None):
+        if devices is not None:
+            self.devices = devices
+        
+        # Очистка сетки
         while self.devices_grid.count():
             item = self.devices_grid.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.deleteLater()
-
-        devices.sort()
-        self.device_checkboxes = [QCheckBox(device) for device in devices]
-
+        
+        # Сортировка и создание чекбоксов для каждого устройства
+        self.devices.sort()
+        self.device_checkboxes = [QCheckBox(device) for device in self.devices]
+        
         num_rows = len(self.device_checkboxes) // 4 + (len(self.device_checkboxes) % 4 != 0)
-
+        
         for index, checkbox in enumerate(self.device_checkboxes):
             row = index // 4
             col = index % 4
             self.devices_grid.addWidget(checkbox, row, col)
-
+        
         if remove_device_combo_box:
             remove_device_combo_box.clear()
-            remove_device_combo_box.addItems(devices)
+            remove_device_combo_box.addItems(self.devices)
             remove_device_combo_box.setCurrentIndex(-1)
-
+        
         self.devices_grid.update()
-
+    
     def check_device_status(self):
+        device_status, active_devices = get_device_status()
         for checkbox in self.device_checkboxes:
-            device = checkbox.text()
-            status = "device" if self.is_device_connected(device) else "offline"
+            device_name = checkbox.text()
+            status = device_status.get(device_name, "offline")
             update_device_status_ui(checkbox, status)
         print(f"Device statuses updated: {[(cb.text(), cb.isChecked()) for cb in self.device_checkboxes]}")
-
+    
     @staticmethod
     def is_device_connected(device):
         result = subprocess.run(['adb', 'devices'], capture_output=True, text=True)
@@ -601,12 +609,38 @@ class ControlTab(QWidget):
         self.output_text.clear()
         self.highlight_positions = []
         self.current_highlight_index = -1
-
+    
     def connect_devices(self):
-        self.execute_device_command("connect")
-
+        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
+        if not selected_devices:
+            QMessageBox.warning(self, "Warning", "Please select at least one device.")
+            return
+        
+        for device in selected_devices:
+            try:
+                subprocess.run(['adb', 'connect', device], check=True)
+                self.output_text.append(f"<strong>Connected to device: {device}</strong>\n")
+            except subprocess.CalledProcessError as e:
+                self.output_text.append(
+                    f"<span style='color:red;'><strong>ERROR connecting to {device}: {str(e)}</strong></span>\n")
+        
+        self.check_device_status()
+    
     def disconnect_devices(self):
-        self.execute_device_command("disconnect")
+        selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
+        if not selected_devices:
+            QMessageBox.warning(self, "Warning", "Please select at least one device.")
+            return
+        
+        for device in selected_devices:
+            try:
+                subprocess.run(['adb', 'disconnect', device], check=True)
+                self.output_text.append(f"<strong>Disconnected from device: {device}</strong>\n")
+            except subprocess.CalledProcessError as e:
+                self.output_text.append(
+                    f"<span style='color:red;'><strong>ERROR disconnecting from {device}: {str(e)}</strong></span>\n")
+        
+        self.check_device_status()
 
     def execute_adb_command_method(self):
         self.execute_device_command(self.command_combobox.currentText())
