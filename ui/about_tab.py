@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTextEdit, QGr
 class AboutTab(QWidget):
     APP_INFO_LABELS = [
         ("ADB Controller", 12, True),
-        ("Version: 2.0.0-rc.6", 9, False),
+        ("Version: 2.0.0-rc.7", 9, False),
         ("Author: Eugene Vervai", 9, False),
         ("Contact: delspin1@gmail.com", 9, False),
         ("License: MIT License", 9, False)
