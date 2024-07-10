@@ -10,7 +10,7 @@ from packaging import version
 class AboutTab(QWidget):
     APP_INFO_LABELS = [
         ("ADB Controller", 12, True),
-        ("Version: 2.0.0-rc.5", 9, False),
+        ("Version: 2.0.0-rc.6", 9, False),
         ("Author: Eugene Vervai", 9, False),
         ("Contact: delspin1@gmail.com", 9, False),
         ("License: MIT License", 9, False)
@@ -31,7 +31,7 @@ class AboutTab(QWidget):
         "ADB commands with ease."
     )
     
-    CURRENT_VERSION = "2.0.0-rc.5"  # текущая версия приложения
+    CURRENT_VERSION = "2.0.0-rc.6"  # текущая версия приложения
     REPO_API_URL = "https://api.github.com/repos/EndoTouma/ADB_Controller/releases/latest"
     
     def __init__(self):
