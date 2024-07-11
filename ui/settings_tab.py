@@ -136,15 +136,23 @@ class SettingsTab(QWidget):
         try:
             app_path = sys.argv[0]
             old_path = app_path + ".old"
+            app_name = os.path.basename(app_path)
+            new_app_name = app_name
+            
+            if "ADB_Controller" in app_name:
+                new_app_name = app_name.replace("ADB_Controller", "ADB_Manager")
+            
+            new_app_path = os.path.join(os.path.dirname(app_path), new_app_name)
+            
             if os.path.exists(app_path):
                 os.rename(app_path, old_path)
-            shutil.move(new_file_path, app_path)
-            QMessageBox.information(self, "Update", "New version installed. The application will now restart.")
+            shutil.move(new_file_path, new_app_path)
+            QMessageBox.information(self, "Update",
+                                    f"New version installed. The application will now restart as {new_app_name}.")
             QTimer.singleShot(0, lambda: QApplication.quit())
-            QTimer.singleShot(1000, lambda: os.execl(sys.executable, sys.executable, *sys.argv))
+            QTimer.singleShot(1000, lambda: os.execl(sys.executable, new_app_path, *sys.argv))
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to replace the application file: {str(e)}")
-            # If an error occurs, attempt to restore the backup
             if os.path.exists(old_path):
                 os.rename(old_path, app_path)
 
@@ -211,4 +219,3 @@ class UpdateDownloadThread(QThread):
             self.finished.emit({"status": "success", "file_path": new_file_path})
         except requests.RequestException as e:
             self.finished.emit({"status": "error", "message": str(e)})
-
