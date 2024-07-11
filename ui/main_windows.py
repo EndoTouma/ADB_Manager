@@ -12,7 +12,7 @@ WINDOW_X_POS = 100
 WINDOW_Y_POS = 100
 
 
-class ADBController(QWidget):
+class ADBManager(QWidget):
     
     def __init__(self, devices=None, commands=None, theme=None):
         super().__init__()
