@@ -49,6 +49,7 @@ class SettingsTab(QWidget):
         self.theme_toggle = QPushButton("Toggle Dark Theme")
         self.theme_toggle.setCheckable(True)
         self.theme_toggle.setChecked(self.theme == "Fusion")
+        self.update_theme_toggle_text(self.theme_toggle.isChecked())
         self.theme_toggle.toggled.connect(self.change_theme)  # Connect to the toggled signal
         theme_layout.addWidget(self.theme_toggle)
         theme_group.setLayout(theme_layout)
@@ -57,20 +58,23 @@ class SettingsTab(QWidget):
         layout_settings.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.setLayout(layout_settings)
     
+    def update_theme_toggle_text(self, checked):
+        if checked:
+            self.theme_toggle.setText("Switch to Light Theme")
+        else:
+            self.theme_toggle.setText("Switch to Dark Theme")
+    
     def change_theme(self, checked):
         if self.is_initializing:
             return  # Не делаем ничего, если идет инициализация
         
-        print(f"Change theme triggered, state: {checked}, is currently checked: {self.theme_toggle.isChecked()}")
+        self.update_theme_toggle_text(checked)
+        
         new_theme = "Fusion" if checked else "WindowsVista"
         if self.theme != new_theme:
-            print(f"Changing theme from {self.theme} to {new_theme}")
             self.theme = new_theme
             QApplication.instance().setStyle(self.theme)
             DataManager.save_data(self.devices, self.commands, self.theme)
-            print("Data saved for theme:", self.theme)
-        else:
-            print("No change in theme, no data saved.")
     
     def showEvent(self, event):
         super().showEvent(event)
@@ -209,3 +213,4 @@ class UpdateDownloadThread(QThread):
             self.finished.emit({"status": "success", "file_path": new_file_path})
         except requests.RequestException as e:
             self.finished.emit({"status": "error", "message": str(e)})
+
