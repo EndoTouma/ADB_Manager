@@ -11,7 +11,7 @@ from utils.data_management import DataManager
 
 
 class SettingsTab(QWidget):
-    CURRENT_VERSION = "2.0.0-rc.8"
+    CURRENT_VERSION = "2.0.0-rc.11"
     REPO_API_URL = "https://api.github.com/repos/EndoTouma/ADB_Controller/releases/latest"
     
     def __init__(self, devices, commands, theme, controller):
@@ -20,9 +20,9 @@ class SettingsTab(QWidget):
         self.commands = commands
         self.theme = theme
         self.controller = controller
-        self.is_initializing = True  # Начинаем с инициализации
+        self.is_initializing = True
         self.init_ui()
-        self.is_initializing = False  # Закончили инициализацию
+        self.is_initializing = False
     
     def init_ui(self):
         layout_settings = QVBoxLayout(self)
@@ -49,7 +49,8 @@ class SettingsTab(QWidget):
         self.theme_toggle = QPushButton("Toggle Dark Theme")
         self.theme_toggle.setCheckable(True)
         self.theme_toggle.setChecked(self.theme == "Fusion")
-        self.theme_toggle.toggled.connect(self.change_theme)  # Connect to the toggled signal
+        self.update_theme_toggle_text(self.theme_toggle.isChecked())
+        self.theme_toggle.toggled.connect(self.change_theme)
         theme_layout.addWidget(self.theme_toggle)
         theme_group.setLayout(theme_layout)
         layout_settings.addWidget(theme_group)
@@ -57,20 +58,23 @@ class SettingsTab(QWidget):
         layout_settings.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.setLayout(layout_settings)
     
+    def update_theme_toggle_text(self, checked):
+        if checked:
+            self.theme_toggle.setText("Switch to Light Theme")
+        else:
+            self.theme_toggle.setText("Switch to Dark Theme")
+    
     def change_theme(self, checked):
         if self.is_initializing:
-            return  # Не делаем ничего, если идет инициализация
+            return
         
-        print(f"Change theme triggered, state: {checked}, is currently checked: {self.theme_toggle.isChecked()}")
+        self.update_theme_toggle_text(checked)
+        
         new_theme = "Fusion" if checked else "WindowsVista"
         if self.theme != new_theme:
-            print(f"Changing theme from {self.theme} to {new_theme}")
             self.theme = new_theme
             QApplication.instance().setStyle(self.theme)
             DataManager.save_data(self.devices, self.commands, self.theme)
-            print("Data saved for theme:", self.theme)
-        else:
-            print("No change in theme, no data saved.")
     
     def showEvent(self, event):
         super().showEvent(event)
@@ -131,23 +135,18 @@ class SettingsTab(QWidget):
     def replace_and_restart(self, new_file_path):
         try:
             app_path = sys.argv[0]
-            backup_path = app_path + ".bak"
-            # Backup the current executable
+            old_path = app_path + ".old"
             if os.path.exists(app_path):
-                os.rename(app_path, backup_path)
-            # Move the new file to the application path
+                os.rename(app_path, old_path)
             shutil.move(new_file_path, app_path)
-            # Remove the backup after the new file is in place
-            if os.path.exists(backup_path):
-                os.remove(backup_path)
             QMessageBox.information(self, "Update", "New version installed. The application will now restart.")
             QTimer.singleShot(0, lambda: QApplication.quit())
             QTimer.singleShot(1000, lambda: os.execl(sys.executable, sys.executable, *sys.argv))
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to replace the application file: {str(e)}")
             # If an error occurs, attempt to restore the backup
-            if os.path.exists(backup_path):
-                os.rename(backup_path, app_path)
+            if os.path.exists(old_path):
+                os.rename(old_path, app_path)
 
 
 class UpdateCheckThread(QThread):
@@ -201,7 +200,7 @@ class UpdateDownloadThread(QThread):
             
             total_length = int(total_length)
             downloaded = 0
-            new_file_path = sys.argv[0]
+            new_file_path = sys.argv[0] + ".new"
             
             with open(new_file_path, "wb") as file:
                 for data in response.iter_content(chunk_size=4096):
@@ -212,3 +211,4 @@ class UpdateDownloadThread(QThread):
             self.finished.emit({"status": "success", "file_path": new_file_path})
         except requests.RequestException as e:
             self.finished.emit({"status": "error", "message": str(e)})
+

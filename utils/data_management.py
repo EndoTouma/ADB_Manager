@@ -3,9 +3,9 @@ import os
 
 
 class DataManager:
+    
     @staticmethod
     def load_data(filename="adb_data.json"):
-        """ Загрузка данных из файла """
         try:
             with open(filename, "r") as f:
                 data = json.load(f)
@@ -34,7 +34,6 @@ class DataManager:
 
     @staticmethod
     def log_file_contents(filename):
-        """ Логирование содержимого файла после записи """
         try:
             with open(filename, "r") as f:
                 content = json.load(f)

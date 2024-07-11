@@ -12,7 +12,7 @@ WINDOW_X_POS = 100
 WINDOW_Y_POS = 100
 
 
-class ADBController(QWidget):
+class ADBManager(QWidget):
     
     def __init__(self, devices=None, commands=None, theme=None):
         super().__init__()
@@ -42,7 +42,7 @@ class ADBController(QWidget):
         layout.addWidget(tabs)
         self.setLayout(layout)
         
-        self.setWindowTitle("ADB Controller")
+        self.setWindowTitle("ADB Manager")
         self.setGeometry(WINDOW_X_POS, WINDOW_Y_POS, WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setWindowIcon(QIcon('resources/adb.ico'))
