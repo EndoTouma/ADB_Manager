@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
-from ui.main_windows import ADBController
+from ui.main_windows import ADBManager
 from utils.data_management import DataManager
 import resources.icons_rc
 
@@ -11,7 +11,7 @@ if __name__ == "__main__":
     
     devices, commands, theme = DataManager.load_data()
     
-    ex = ADBController(devices, commands, theme)
+    ex = ADBManager(devices, commands, theme)
     ex.setWindowIcon(QIcon(':/adb.ico'))
     
     sys.exit(app.exec())

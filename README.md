@@ -1,10 +1,10 @@
-# ADB Controller 🚀
+# ADB Manager 🚀
 
 An efficient and easy way to manage your ADB devices directly from your computer.
 
 ## 🎯 Goal
 
-The aim of ADB Controller is to provide a convenient, easy-to-use interface for managing Android devices through [Android Debug Bridge (ADB)](https://developer.android.com/studio/command-line/adb).
+The aim of ADB Manager is to provide a convenient, easy-to-use interface for managing Android devices through [Android Debug Bridge (ADB)](https://developer.android.com/studio/command-line/adb).
 
 ## 🛠️ Installation and Launch
 
@@ -22,7 +22,7 @@ The aim of ADB Controller is to provide a convenient, easy-to-use interface for 
    
 2. Navigate to the project directory:
     ```sh
-    cd ADBController
+    cd ADBManager
    
 3. Install the dependencies:
     ```sh
