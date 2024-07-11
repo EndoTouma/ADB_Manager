@@ -9,10 +9,8 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon(':/adb.ico'))
     
-    # Загрузка данных перед созданием экземпляра
     devices, commands, theme = DataManager.load_data()
     
-    # Создание экземпляра с загруженными данными
     ex = ADBController(devices, commands, theme)
     ex.setWindowIcon(QIcon(':/adb.ico'))
     

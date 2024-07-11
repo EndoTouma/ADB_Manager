@@ -20,9 +20,9 @@ class SettingsTab(QWidget):
         self.commands = commands
         self.theme = theme
         self.controller = controller
-        self.is_initializing = True  # Начинаем с инициализации
+        self.is_initializing = True
         self.init_ui()
-        self.is_initializing = False  # Закончили инициализацию
+        self.is_initializing = False
     
     def init_ui(self):
         layout_settings = QVBoxLayout(self)
@@ -50,7 +50,7 @@ class SettingsTab(QWidget):
         self.theme_toggle.setCheckable(True)
         self.theme_toggle.setChecked(self.theme == "Fusion")
         self.update_theme_toggle_text(self.theme_toggle.isChecked())
-        self.theme_toggle.toggled.connect(self.change_theme)  # Connect to the toggled signal
+        self.theme_toggle.toggled.connect(self.change_theme)
         theme_layout.addWidget(self.theme_toggle)
         theme_group.setLayout(theme_layout)
         layout_settings.addWidget(theme_group)
@@ -66,7 +66,7 @@ class SettingsTab(QWidget):
     
     def change_theme(self, checked):
         if self.is_initializing:
-            return  # Не делаем ничего, если идет инициализация
+            return
         
         self.update_theme_toggle_text(checked)
         
@@ -136,10 +136,8 @@ class SettingsTab(QWidget):
         try:
             app_path = sys.argv[0]
             old_path = app_path + ".old"
-            # Backup the current executable
             if os.path.exists(app_path):
                 os.rename(app_path, old_path)
-            # Move the new file to the application path
             shutil.move(new_file_path, app_path)
             QMessageBox.information(self, "Update", "New version installed. The application will now restart.")
             QTimer.singleShot(0, lambda: QApplication.quit())

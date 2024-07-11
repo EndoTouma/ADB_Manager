@@ -240,14 +240,12 @@ class ControlTab(QWidget):
         if devices is not None:
             self.devices = devices
         
-        # Очистка сетки
         while self.devices_grid.count():
             item = self.devices_grid.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.deleteLater()
         
-        # Сортировка и создание чекбоксов для каждого устройства
         self.devices.sort()
         self.device_checkboxes = [QCheckBox(device) for device in self.devices]
         
@@ -546,24 +544,3 @@ class ControlTab(QWidget):
         self.output_text.append(f"<strong>Logcat finished for device: {device}</strong>\n")
         if device in self.logcat_threads:
             del self.logcat_threads[device]
-
-
-if __name__ == "__main__":
-    import sys
-    
-    app = QApplication(sys.argv)
-    devices = ["192.168.1.100:5555"]
-    commands = ["shell getprop", "install example.apk"]
-    
-    main_window = QMainWindow()
-    main_window.setWindowTitle("ADB Control Panel")
-    
-    tab_widget = QTabWidget()
-    control_tab = ControlTab(devices, commands)
-    tab_widget.addTab(control_tab, "Control")
-    
-    main_window.setCentralWidget(tab_widget)
-    main_window.resize(1024, 768)
-    main_window.show()
-    
-    sys.exit(app.exec())
