@@ -18,7 +18,7 @@ The aim of ADB Manager is to provide a convenient, easy-to-use interface for man
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/EndoTouma/ADBController.git
+   git clone https://github.com/EndoTouma/ADBManager.git
    
 2. Navigate to the project directory:
     ```sh
