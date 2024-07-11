@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTextEdit, QGr
 
 class AboutTab(QWidget):
     APP_INFO_LABELS = [
-        ("ADB Controller", 12, True),
+        ("ADB Manager", 12, True),
         ("Version: 2.0.0-rc.11", 9, False),
         ("Author: Eugene Vervai", 9, False),
         ("Contact: delspin1@gmail.com", 9, False),
@@ -13,7 +13,7 @@ class AboutTab(QWidget):
     ]
     
     DESCRIPTION_TEXT = (
-        "ADB Controller is an easy-to-use application designed to help you manage and control "
+        "ADB Manager is an easy-to-use application designed to help you manage and control "
         "your devices using Android Debug Bridge (ADB) commands. With this app, you can effortlessly "
         "add and remove devices and commands to fit your specific needs, all through a user-friendly "
         "interface that eliminates the need for manual command line input.\n\n"
@@ -22,7 +22,7 @@ class AboutTab(QWidget):
         "    - Add and remove devices and commands easily through a simple UI.\n"
         "    - Monitor command execution output directly within the app.\n"
         "    - Real-time log monitoring and filtering.\n\n"
-        "Whether you're a developer, tester, or tech enthusiast, ADB Controller is designed to "
+        "Whether you're a developer, tester, or tech enthusiast, ADB Manager is designed to "
         "streamline your workflow by providing a convenient interface for managing devices and executing "
         "ADB commands with ease."
     )
