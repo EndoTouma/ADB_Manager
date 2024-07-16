@@ -1,6 +1,5 @@
 import subprocess
 import time
-
 import chardet
 from PyQt6.QtWidgets import QMessageBox
 
@@ -24,9 +23,12 @@ def execute_adb_command(device, command, output_text_widget):
         
         start_time = time.time()
         
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        
         process = subprocess.Popen(
-            adb_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW
+            adb_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            startupinfo=startupinfo, creationflags=subprocess.CREATE_NO_WINDOW
         )
         output, error = process.communicate()
         
@@ -47,9 +49,14 @@ def execute_adb_command(device, command, output_text_widget):
     
     return execution_time
 
+
 def execute_adb_commands(device, command):
     try:
-        result = subprocess.run(['adb', '-s', device] + command.split(), capture_output=True, text=True)
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        
+        result = subprocess.run(['adb', '-s', device] + command.split(), capture_output=True, text=True,
+                                startupinfo=startupinfo)
         if result.returncode == 0:
             return result.stdout
         else:

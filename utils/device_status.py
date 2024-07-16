@@ -14,15 +14,17 @@ def update_device_status_ui(checkbox, status):
 
 
 def get_device_status():
+    result = subprocess.run(['adb', 'devices'], capture_output=True, text=True)
+    device_lines = result.stdout.strip().split("\n")[1:]  # пропускаем первую строку заголовка
     device_status = {}
-    active_devices = []
-    result = subprocess.run(['adb', 'devices', '-l'], stdout=subprocess.PIPE).stdout.decode('utf-8')
-    lines = result.split('\n')
-    for line in lines[1:]:
-        if line.strip():
-            parts = line.split()
-            device_name = parts[0]
-            device_state = parts[1]
-            device_status[device_name] = device_state
-            active_devices.append(device_name)
-    return device_status, active_devices
+    devices = []
+    for line in device_lines:
+        if line.strip():  # игнорируем пустые строки
+            parts = line.split("\t")
+            if len(parts) == 2:
+                device, status = parts
+                device_status[device] = status
+                devices.append(device)
+    return device_status, devices
+
+

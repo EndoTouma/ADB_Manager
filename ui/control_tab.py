@@ -1,20 +1,16 @@
-import logging
 import subprocess
+import re
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QRegularExpression
-from PyQt6.QtGui import QFontMetrics, QPalette, QColor, QTextCursor, QTextCharFormat, QSyntaxHighlighter
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import *
 
-from utils.adb_executor import execute_adb_commands
-from utils.data_management import DataManager
-from utils.logcat_thread import LogcatThread
-from utils.log_viewer import LogViewerDialog, run_log_viewer, LogHighlighter
-from utils.device_status import update_device_status_ui, get_device_status
-from utils.apk_manager import APKManager
 from utils.command_thread import CommandThread
+from utils.data_management import DataManager
 from utils.delete_command_dialog import DeleteCommandDialog
-from utils.delete_device_dialog import DeleteDeviceDialog
+from utils.device_status import update_device_status_ui, get_device_status
+from utils.log_viewer import run_log_viewer, LogHighlighter
+from utils.logcat_thread import LogcatThread
 
 
 class ControlTab(QWidget):
@@ -43,7 +39,7 @@ class ControlTab(QWidget):
         self.init_ui()
         
         self.update_device_grid(self.devices)
-        self.check_device_status()
+        # self.check_device_status()
         
         self.setAcceptDrops(True)
     
@@ -152,9 +148,19 @@ class ControlTab(QWidget):
         layout.addLayout(command_button_layout)
         return layout
     
+    import re
+    
     def add_device(self):
         text, ok = QInputDialog.getText(self, "Add Device", "Enter IP and Port (format: IP[:Port]):")
         if ok and text:
+            ip_port_pattern = re.compile(
+                r"^(?:(?:\d{1,3}\.){3}\d{1,3})(?::\d{1,5})?$"  # Шаблон для формата IP и IP:Port
+            )
+            if not ip_port_pattern.match(text):
+                QMessageBox.warning(self, "Invalid input",
+                                    "Invalid format. Please use format: IP[:Port], e.g., 192.168.0.1 or 192.168.0.1:5555.")
+                return
+            
             try:
                 parts = text.split(":")
                 ip = parts[0]
@@ -168,7 +174,8 @@ class ControlTab(QWidget):
                 else:
                     QMessageBox.warning(self, "Duplicate Device", "Device already exists.")
             except ValueError:
-                QMessageBox.warning(self, "Invalid input", "Please use format: IP[:Port].")
+                QMessageBox.warning(self, "Invalid input",
+                                    "Invalid format. Please use format: IP[:Port], e.g., 192.168.0.1 or 192.168.0.1:5555.")
     
     def delete_device(self):
         selected_devices = [checkbox.text() for checkbox in self.device_checkboxes if checkbox.isChecked()]
@@ -177,9 +184,15 @@ class ControlTab(QWidget):
             return
         
         for device in selected_devices:
-            self.devices.remove(device)
+            if ":" in device:
+                try:
+                    self.devices.remove(device)
+                except ValueError:
+                    QMessageBox.warning(self, "Error", f"Unable to delete device {device}.")
+            else:
+                QMessageBox.warning(self, "Error", f"Cannot delete USB device {device}.")
         
-        self.update_device_grid()
+        self.update_device_grid(self.devices)
         DataManager.save_data(self.devices, self.commands)
         self.check_device_status()
     
@@ -229,16 +242,25 @@ class ControlTab(QWidget):
             del self.command_threads[device]
     
     def refresh_device_list(self):
-        device_status, active_devices = get_device_status()
-        self.update_device_grid(active_devices)
+        self.check_device_status()
+    
+    def check_device_status(self):
+        device_status, connected_devices = get_device_status()
+        # Фильтруем устройства, подключенные по USB
+        wifi_devices = [device for device in self.devices if ":" in device]
+        all_devices = list(set(wifi_devices + connected_devices))
+        self.update_device_grid(all_devices)
         for checkbox in self.device_checkboxes:
             device_name = checkbox.text()
             status = device_status.get(device_name, "offline")
             update_device_status_ui(checkbox, status)
     
     def update_device_grid(self, devices=None, remove_device_combo_box=None):
-        if devices is not None:
-            self.devices = devices
+        if devices is None:
+            devices = self.devices  # Используем self.devices по умолчанию
+        
+        # Оставляем только устройства, подключенные по Wi-Fi
+        self.devices = [device for device in devices if ":" in device]
         
         while self.devices_grid.count():
             item = self.devices_grid.takeAt(0)
@@ -247,7 +269,7 @@ class ControlTab(QWidget):
                 widget.deleteLater()
         
         self.devices.sort()
-        self.device_checkboxes = [QCheckBox(device) for device in self.devices]
+        self.device_checkboxes = [QCheckBox(device) for device in devices]
         
         num_rows = len(self.device_checkboxes) // 4 + (len(self.device_checkboxes) % 4 != 0)
         
@@ -262,14 +284,6 @@ class ControlTab(QWidget):
             remove_device_combo_box.setCurrentIndex(-1)
         
         self.devices_grid.update()
-    
-    def check_device_status(self):
-        device_status, active_devices = get_device_status()
-        for checkbox in self.device_checkboxes:
-            device_name = checkbox.text()
-            status = device_status.get(device_name, "offline")
-            update_device_status_ui(checkbox, status)
-        print(f"Device statuses updated: {[(cb.text(), cb.isChecked()) for cb in self.device_checkboxes]}")
     
     @staticmethod
     def is_device_connected(device):

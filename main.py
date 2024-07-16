@@ -9,9 +9,15 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon(':/adb.ico'))
     
-    devices, commands, theme = DataManager.load_data()
+    # Загрузка данных об устройствах и командах
+    devices, commands = DataManager.load_data()
     
-    ex = ADBManager(devices, commands, theme)
+    # Загрузка токена и идентификатора чата
+    token, chat_id = DataManager.load_credentials()
+    
+    app.setStyle("WindowsVista")
+    
+    ex = ADBManager(devices, commands, token, chat_id)
     ex.setWindowIcon(QIcon(':/adb.ico'))
     
     sys.exit(app.exec())
