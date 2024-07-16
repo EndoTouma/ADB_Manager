@@ -1,9 +1,8 @@
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget, QApplication
-
 from ui.about_tab import AboutTab
 from ui.control_tab import ControlTab
-from ui.settings_tab import SettingsTab
+from ui.device_monitor_tab import DeviceMonitorTab
 from utils.data_management import DataManager
 
 WINDOW_WIDTH = 700
@@ -13,19 +12,20 @@ WINDOW_Y_POS = 100
 
 
 class ADBManager(QWidget):
-    
-    def __init__(self, devices=None, commands=None, theme=None):
+    def __init__(self, devices=None, commands=None, telegram_token='', telegram_chat_id=''):
         super().__init__()
         
-        if devices is None or commands is None or theme is None:
-            devices, commands, theme = DataManager.load_data()
+        if devices is None or commands is None:
+            devices, commands = DataManager.load_data()
         
         self.devices = devices
         self.commands = commands
-        self.theme = theme
+        self.telegram_token = telegram_token
+        self.telegram_chat_id = telegram_chat_id
         
         self.tab_control = ControlTab(self.devices, self.commands)
-        self.tab_settings = SettingsTab(self.devices, self.commands, self.theme, self)
+        self.tab_about = AboutTab()
+        self.tab_monitor = DeviceMonitorTab(self.devices, self.commands, self.telegram_token, self.telegram_chat_id)
         
         self.init_ui()
         self.tab_control.refresh_device_list()
@@ -36,26 +36,15 @@ class ADBManager(QWidget):
         
         tab_about = AboutTab()
         tabs.addTab(self.tab_control, "Control")
-        tabs.addTab(self.tab_settings, "Settings")
+        tabs.addTab(self.tab_monitor, "Monitoring")
         tabs.addTab(tab_about, "About")
         
         layout.addWidget(tabs)
         self.setLayout(layout)
         
         self.setWindowTitle("ADB Manager")
-        self.setGeometry(WINDOW_X_POS, WINDOW_Y_POS, WINDOW_WIDTH, WINDOW_HEIGHT)
-        self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+        self.setGeometry(100, 100, 700, 900)
+        self.setFixedSize(700, 900)
         self.setWindowIcon(QIcon('resources/adb.ico'))
         
-        self.apply_theme()
         self.show()
-    
-    def apply_theme(self):
-        print(f"Applying theme at startup: {self.theme}")
-        QApplication.instance().setStyle(self.theme)
-        should_be_checked = (self.theme == "Fusion")
-        if self.tab_settings.theme_toggle.isChecked() != should_be_checked:
-            self.tab_settings.theme_toggle.blockSignals(True)
-            self.tab_settings.theme_toggle.setChecked(should_be_checked)
-            self.tab_settings.theme_toggle.blockSignals(False)
-        print("Theme applied with state: ", should_be_checked)
