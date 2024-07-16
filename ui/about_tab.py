@@ -30,7 +30,7 @@ class AboutTab(QWidget):
         "ADB commands with ease."
     )
 
-    CURRENT_VERSION = "2.0.0-rc.11"
+    CURRENT_VERSION = "2.0.0"
     REPO_API_URL = "https://api.github.com/repos/EndoTouma/ADB_Manager/releases/latest"
 
     def __init__(self):
