@@ -1,6 +1,6 @@
 import logging
 from PyQt6.QtCore import Qt, QRegularExpression
-from PyQt6.QtGui import QTextCursor, QTextCharFormat, QSyntaxHighlighter
+from PyQt6.QtGui import QTextCursor, QTextCharFormat, QSyntaxHighlighter, QColor
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QHBoxLayout, QLineEdit, QPushButton
 
 
