@@ -76,10 +76,13 @@ class DeviceMonitorTab(QWidget):
                 formatted_events = []
                 for event in events:
                     time_device, message = event.split(" - ", 1)
-                    formatted_time_device = f"**{time_device}**"
-                    formatted_message = f"*{message}*"
-                    emoji = "🟢" if "Connected" in message else "🚫"
-                    formatted_events.append(f"{emoji}{formatted_time_device} - {formatted_message}")
+                    time_device_formatted = f"**{time_device}**"
+                    device_name, status = message.split(": ", 1)
+                    device_name_formatted = f"***{device_name}***"
+                    status_formatted = f"*{status}*"
+                    emoji = "🟢" if "Connected" in status else "🚫"
+                    formatted_events.append(
+                        f"{emoji} {time_device_formatted} - {device_name_formatted}: {status_formatted}")
                 message = f"{formatted_hostname} - События:\n" + "\n".join(formatted_events)
                 self.send_telegram_message(message)
             self.device_event_buffer.clear()
