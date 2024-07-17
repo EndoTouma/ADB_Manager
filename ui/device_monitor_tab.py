@@ -26,8 +26,9 @@ class DeviceMonitorTab(QWidget):
         self.monitor_thread.device_event.connect(self.buffer_device_event)
         self.monitor_thread.start()
         self.load_telegram_credentials()
-        self.hostname = socket.gethostname()
+        self.hostname = self.get_formatted_hostname()
         self.start_message_timer()
+        self.start_daily_report_timer()
     
     def init_ui(self):
         layout_monitor = QVBoxLayout(self)
@@ -40,26 +41,62 @@ class DeviceMonitorTab(QWidget):
     def start_message_timer(self):
         self.message_timer = QTimer(self)
         self.message_timer.timeout.connect(self.send_grouped_messages)
-        self.message_timer.start(60000)  # Send messages every 60 seconds
+        self.message_timer.start(60000)
+    
+    def start_daily_report_timer(self):
+        self.daily_report_timer = QTimer(self)
+        self.daily_report_timer.timeout.connect(self.send_daily_report)
+        self.set_daily_timer(23, 59)
+    
+    def set_daily_timer(self, hour, minute):
+        now = time.localtime()
+        first_time = time.mktime(time.struct_time(
+            (now.tm_year, now.tm_mon, now.tm_mday, hour, minute, 0, now.tm_wday, now.tm_yday, now.tm_isdst)))
+        if first_time < time.time():
+            first_time += 86400
+        self.daily_report_timer.start(int(first_time - time.time()) * 1000)
     
     def buffer_device_event(self, device, event):
-        current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+        current_time = time.strftime('%d.%m.%Y %H:%M:%S')
         with self.buffer_lock:
             if self.hostname not in self.device_event_buffer:
                 self.device_event_buffer[self.hostname] = []
             self.device_event_buffer[self.hostname].append(f"{current_time} - {device}: {event}")
+            if device not in self.device_status_history:
+                self.device_status_history[device] = {"Connected": 0, "Disconnected": 0}
+            if "Connected" in event:
+                self.device_status_history[device]["Connected"] += 1
+            else:
+                self.device_status_history[device]["Disconnected"] += 1
     
     def send_grouped_messages(self):
         with self.buffer_lock:
             for hostname, events in self.device_event_buffer.items():
-                message = f"{hostname} - Events:\n" + "\n".join(events)
+                formatted_hostname = f"**{hostname}**"
+                formatted_events = []
+                for event in events:
+                    time_device, message = event.split(" - ", 1)
+                    formatted_time_device = f"**{time_device}**"
+                    formatted_message = f"*{message}*"
+                    emoji = "🟢" if "Connected" in message else "🚫"
+                    formatted_events.append(f"{emoji}{formatted_time_device} - {formatted_message}")
+                message = f"{formatted_hostname} - События:\n" + "\n".join(formatted_events)
                 self.send_telegram_message(message)
             self.device_event_buffer.clear()
+    
+    def send_daily_report(self):
+        report = "Ежедневный отчет о статусах устройств:\n"
+        for device, status in self.device_status_history.items():
+            report += f"Устройство {device}:\n"
+            report += f" - Подключено: {status['Connected']} раз(а)\n"
+            report += f" - Отключено: {status['Disconnected']} раз(а)\n"
+        self.send_telegram_message(report)
+        self.device_status_history.clear()
     
     def send_telegram_message(self, message):
         if self.telegram_token and self.telegram_chat_id:
             url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
-            data = {"chat_id": self.telegram_chat_id, "text": message}
+            data = {"chat_id": self.telegram_chat_id, "text": message, "parse_mode": "Markdown"}
             requests.post(url, data=data)
     
     def connect_to_telegram(self):
@@ -71,7 +108,6 @@ class DeviceMonitorTab(QWidget):
         self.set_telegram_fields_editable(False)
         self.disconnect_button.setEnabled(True)
         
-        # Show "Connected" label and hide input fields
         self.token_input.hide()
         self.chat_id_input.hide()
         self.connected_label.show()
@@ -111,7 +147,6 @@ class DeviceMonitorTab(QWidget):
         self.token_input.setReadOnly(not editable)
         self.chat_id_input.setReadOnly(not editable)
         self.connect_button.setEnabled(editable)
-
     
     def closeEvent(self, event):
         self.monitor_thread.stop()
@@ -146,6 +181,16 @@ class DeviceMonitorTab(QWidget):
         layout.addWidget(self.disconnect_button)
         group.setLayout(layout)
         return group
+    
+    def get_formatted_hostname(self):
+        hostname_mapping = {
+            "DESKTOP-LJB7H4O": "HUB",
+            "Testers-PC54": "NODE 4",
+            "testers-pc1": "NODE 1",
+            "Testers-PC2": "NODE 2",
+            "Testers-PC3": "NODE 3"
+        }
+        return hostname_mapping.get(socket.gethostname(), socket.gethostname())
 
 
 class DeviceMonitorThread(QThread):
