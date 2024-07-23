@@ -28,7 +28,6 @@ class DeviceMonitorTab(QWidget):
         self.load_telegram_credentials()
         self.hostname = self.get_formatted_hostname()
         self.start_message_timer()
-        self.start_daily_report_timer()
     
     def init_ui(self):
         layout_monitor = QVBoxLayout(self)
@@ -42,19 +41,6 @@ class DeviceMonitorTab(QWidget):
         self.message_timer = QTimer(self)
         self.message_timer.timeout.connect(self.send_grouped_messages)
         self.message_timer.start(60000)
-    
-    def start_daily_report_timer(self):
-        self.daily_report_timer = QTimer(self)
-        self.daily_report_timer.timeout.connect(self.send_daily_report)
-        self.set_daily_timer(23, 59)
-    
-    def set_daily_timer(self, hour, minute):
-        now = time.localtime()
-        first_time = time.mktime(time.struct_time(
-            (now.tm_year, now.tm_mon, now.tm_mday, hour, minute, 0, now.tm_wday, now.tm_yday, now.tm_isdst)))
-        if first_time < time.time():
-            first_time += 86400
-        self.daily_report_timer.start(int(first_time - time.time()) * 1000)
     
     def buffer_device_event(self, device, event):
         current_time = time.strftime('%d.%m.%Y %H:%M:%S')
@@ -72,29 +58,17 @@ class DeviceMonitorTab(QWidget):
     def send_grouped_messages(self):
         with self.buffer_lock:
             for hostname, events in self.device_event_buffer.items():
-                formatted_hostname = f"**{hostname}**"
+                formatted_hostname = f"**{hostname} - События:**"
                 formatted_events = []
                 for event in events:
                     time_device, message = event.split(" - ", 1)
-                    time_device_formatted = f"**{time_device}**"
                     device_name, status = message.split(": ", 1)
-                    device_name_formatted = f"***{device_name}***"
-                    status_formatted = f"*{status}*"
                     emoji = "🟢" if "Connected" in status else "🚫"
                     formatted_events.append(
-                        f"{emoji} {time_device_formatted} - {device_name_formatted}: {status_formatted}")
-                message = f"{formatted_hostname} - События:\n" + "\n".join(formatted_events)
+                        f"{emoji} {time_device} - **{device_name}**: {status}")
+                message = f"{formatted_hostname}\n" + "\n".join(formatted_events)
                 self.send_telegram_message(message)
             self.device_event_buffer.clear()
-    
-    def send_daily_report(self):
-        report = "Ежедневный отчет о статусах устройств:\n"
-        for device, status in self.device_status_history.items():
-            report += f"Устройство {device}:\n"
-            report += f" - Подключено: {status['Connected']} раз(а)\n"
-            report += f" - Отключено: {status['Disconnected']} раз(а)\n"
-        self.send_telegram_message(report)
-        self.device_status_history.clear()
     
     def send_telegram_message(self, message):
         if self.telegram_token and self.telegram_chat_id:
@@ -131,7 +105,7 @@ class DeviceMonitorTab(QWidget):
     
     def load_telegram_credentials(self):
         token, chat_id = DataManager.load_credentials()
-        if token and chat_id:
+        if (token and chat_id):
             self.telegram_token = token
             self.telegram_chat_id = chat_id
             self.token_input.setText(self.telegram_token)

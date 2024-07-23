@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import *
 from utils.command_thread import CommandThread
 from utils.data_management import DataManager
 from utils.delete_command_dialog import DeleteCommandDialog
+from utils.adb_executor import execute_adb_command
 from utils.device_status import update_device_status_ui, get_device_status
 from utils.log_viewer import run_log_viewer, LogHighlighter
 from utils.logcat_thread import LogcatThread
