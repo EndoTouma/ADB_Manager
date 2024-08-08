@@ -40,7 +40,7 @@ class DeviceMonitorTab(QWidget):
     def start_message_timer(self):
         self.message_timer = QTimer(self)
         self.message_timer.timeout.connect(self.send_grouped_messages)
-        self.message_timer.start(60000)
+        self.message_timer.start(5000)
     
     def buffer_device_event(self, device, event):
         current_time = time.strftime('%d.%m.%Y %H:%M:%S')
