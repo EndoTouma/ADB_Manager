@@ -1,11 +1,17 @@
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QMessageBox, QProgressDialog, QLabel, QGroupBox, QTextEdit, QFrame, QApplication
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QPushButton, QMessageBox, QProgressDialog, QLabel,
+    QGroupBox, QTextEdit, QFrame, QApplication
+)
 import os
 import sys
 import shutil
+import tempfile
+import subprocess
 import requests
 from packaging import version
+
 
 class AboutTab(QWidget):
     APP_INFO_LABELS = [
@@ -30,11 +36,16 @@ class AboutTab(QWidget):
         "ADB commands with ease."
     )
 
-    CURRENT_VERSION = "2.0.3"
+    CURRENT_VERSION = "3.0.0"
     REPO_API_URL = "https://api.github.com/repos/EndoTouma/ADB_Manager/releases/latest"
 
     def __init__(self):
         super().__init__()
+        self._download_url = None
+        self.update_thread: UpdateCheckThread | None = None
+        self.download_thread: UpdateDownloadThread | None = None
+        self.progress_dialog: QProgressDialog | None = None
+        self._checked_once = False
         self.init_ui()
 
     def init_ui(self):
@@ -84,11 +95,23 @@ class AboutTab(QWidget):
     def update_ui(self):
         layout = QVBoxLayout()
         self.current_version_label = QLabel(f"Current Version: {self.CURRENT_VERSION}")
+        self.current_version_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+
         self.latest_version_label = QLabel("Latest Version: Checking...")
-        self.update_status_label = QLabel("Status: You have the latest version.")
+        self.latest_version_label.setStyleSheet("color:#555;")
+        self.latest_version_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+
+        self.update_status_label = QLabel("Status: Checking...")
+        self.update_status_label.setStyleSheet("color:#888;")
+
         self.update_button = QPushButton("Update")
         self.update_button.setEnabled(False)
         self.update_button.clicked.connect(self.update_application)
+
         layout.addWidget(self.current_version_label)
         layout.addWidget(self.latest_version_label)
         layout.addWidget(self.update_status_label)
@@ -97,41 +120,65 @@ class AboutTab(QWidget):
 
     def description_ui(self):
         layout = QVBoxLayout()
-
         description_text = QTextEdit()
         description_text.setText(self.DESCRIPTION_TEXT)
         description_text.setReadOnly(True)
-
         layout.addWidget(description_text)
-
         return layout
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.check_for_updates()
+        if not self._checked_once:
+            self._checked_once = True
+            self.check_for_updates()
+
+    def closeEvent(self, event):
+        try:
+            if self.download_thread and self.download_thread.isRunning():
+                self.download_thread.abort()
+                self.download_thread.wait(2000)
+        except Exception:
+            pass
+        super().closeEvent(event)
 
     def check_for_updates(self):
         self.update_thread = UpdateCheckThread(self.REPO_API_URL, self.CURRENT_VERSION)
-        self.update_thread.finished.connect(self.on_update_check_finished)
+        self.update_thread.done.connect(self.on_update_check_finished)  # <-- НЕ finished!
         self.update_thread.start()
 
-    def on_update_check_finished(self, result):
-        if result["status"] == "error":
+    def on_update_check_finished(self, result: dict):
+        status = result.get("status")
+        if status == "error":
             self.update_status_label.setText("Status: Error checking for updates.")
-            QMessageBox.critical(self, "Error", result["message"])
-        elif result["status"] == "latest":
+            self.update_status_label.setStyleSheet("color:#c00;")
+            QMessageBox.critical(self, "Error", result.get("message", "Unknown error"))
+        elif status == "latest":
+            latest = result.get("latest_version") or self.CURRENT_VERSION
             self.update_status_label.setText("Status: You have the latest version.")
-            self.latest_version_label.setText(f"Latest Version: {self.CURRENT_VERSION}")
-        elif result["status"] == "new_version":
+            self.update_status_label.setStyleSheet("color:#2e7d32;")
+            self.latest_version_label.setText(f"Latest Version: {latest}")
+        elif status == "new_version":
+            latest = result['latest_version']
             self.update_status_label.setText("Status: A new version is available.")
-            self.latest_version_label.setText(f"Latest Version: {result['latest_version']}")
+            self.update_status_label.setStyleSheet("color:#e65100;")
+            self.latest_version_label.setText(f"Latest Version: {latest}")
+            notes = result.get("notes") or ""
+            if notes:
+                QMessageBox.information(self, "Release notes", notes)
             self.update_button.setEnabled(True)
+            self._download_url = result.get("download_url")
 
     def update_application(self):
-        reply = QMessageBox.question(self, "Update Available",
-                                     "A new version is available. Do you want to download and install it?",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                     QMessageBox.StandardButton.Yes)
+        if not self._download_url:
+            QMessageBox.warning(self, "Update", "Download URL is missing.")
+            return
+        reply = QMessageBox.question(
+            self,
+            "Update Available",
+            "A new version is available. Do you want to download and install it?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
         if reply == QMessageBox.StandardButton.Yes:
             self.download_and_replace()
 
@@ -140,105 +187,179 @@ class AboutTab(QWidget):
         self.progress_dialog.setWindowTitle("Update")
         self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         self.progress_dialog.setValue(0)
+        self.progress_dialog.canceled.connect(self._cancel_download)
         self.progress_dialog.show()
 
-        self.download_thread = UpdateDownloadThread(self.update_thread.download_url)
+        self.download_thread = UpdateDownloadThread(self._download_url)
         self.download_thread.progress.connect(self.progress_dialog.setValue)
-        self.download_thread.finished.connect(self.on_download_finished)
+        self.download_thread.done.connect(self.on_download_finished)
         self.download_thread.start()
 
-    def on_download_finished(self, result):
-        self.progress_dialog.close()
-        if result["status"] == "error":
-            QMessageBox.critical(self, "Error", result["message"])
+    def _cancel_download(self):
+        if self.download_thread and self.download_thread.isRunning():
+            self.download_thread.abort()
+
+    def on_download_finished(self, result: dict):
+        if self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+        if result.get("status") == "error":
+            QMessageBox.critical(self, "Error", result.get("message", "Unknown error"))
         else:
             self.replace_and_restart(result["file_path"])
 
     def replace_and_restart(self, new_file_path):
+        old_path = None
         try:
-            app_path = sys.argv[0]
+            app_path = os.path.abspath(sys.argv[0])
+            target_path = app_path
             old_path = app_path + ".old"
-            app_name = os.path.basename(app_path)
-            new_app_name = app_name
 
-            if "ADB_Controller" in app_name:
-                new_app_name = app_name.replace("ADB_Controller", "ADB Manager")
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
 
-            new_app_path = os.path.join(os.path.dirname(app_path), new_app_name)
+            try:
+                os.replace(app_path, old_path)
+            except Exception:
+                pass
 
-            if os.path.exists(app_path):
-                os.rename(app_path, old_path)
-            shutil.move(new_file_path, new_app_path)
-            QMessageBox.information(self, "Update",
-                                    f"New version installed. The application will now restart as {new_app_name}.")
-            QTimer.singleShot(0, lambda: QApplication.quit())
-            QTimer.singleShot(1000, lambda: os.execl(sys.executable, new_app_path, *sys.argv))
+            try:
+                os.replace(new_file_path, target_path)
+            except PermissionError:
+                shutil.copyfile(new_file_path, target_path)
+
+            QMessageBox.information(self, "Update", "New version installed. The application will now restart.")
+
+            try:
+                if sys.executable and sys.executable.lower().endswith(("python.exe", "pythonw.exe")):
+                    subprocess.Popen([sys.executable, target_path] + sys.argv[1:], close_fds=True)
+                else:
+                    subprocess.Popen([target_path] + sys.argv[1:], close_fds=True)
+            except Exception as e:
+                QMessageBox.warning(self, "Restart", f"Failed to auto-restart: {e}\nPlease start the app manually.")
+
+            QApplication.quit()
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to replace the application file: {str(e)}")
-            if os.path.exists(old_path):
-                os.rename(old_path, app_path)
-
+            try:
+                if old_path and os.path.exists(old_path):
+                    os.replace(old_path, app_path)
+            except Exception:
+                pass
 
 class UpdateCheckThread(QThread):
     progress = pyqtSignal(int)
-    finished = pyqtSignal(dict)
+    done = pyqtSignal(dict)
 
     def __init__(self, api_url, current_version):
         super().__init__()
         self.api_url = api_url
         self.current_version = current_version
         self.download_url = ""
+        self.release_notes = ""
+
+    def _normalize_ver(self, s: str) -> str:
+        return (s or "").lstrip("vV").strip()
+
+    def _pick_asset_url(self, assets):
+        if not assets:
+            return None
+        exe = next((a for a in assets if str(a.get("name", "")).lower().endswith(".exe")), None)
+        picked = exe or assets[0]
+        return picked.get("browser_download_url")
 
     def run(self):
         try:
-            response = requests.get(self.api_url)
-            response.raise_for_status()
-            latest_release = response.json()
-            print("API response:", latest_release)  # Debug log
+            headers = {
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "ADB-Manager-Updater"
+            }
+            resp = requests.get(self.api_url, headers=headers, timeout=10)
+            resp.raise_for_status()
+            latest = resp.json()
 
-            latest_version = latest_release["tag_name"]
-            is_newer = version.parse(latest_version) > version.parse(self.current_version)
+            tag = latest.get("tag_name", "")
+            latest_version = self._normalize_ver(tag)
+            current_norm = self._normalize_ver(self.current_version)
+
+            body = latest.get("body") or ""
+            self.release_notes = body[:4000]
+
+            is_newer = version.parse(latest_version) > version.parse(current_norm)
 
             if is_newer:
-                self.download_url = latest_release["assets"][0]["browser_download_url"]
-                self.finished.emit(
-                    {"status": "new_version", "latest_version": latest_version, "download_url": self.download_url})
+                assets = latest.get("assets", [])
+                url = self._pick_asset_url(assets)
+                if not url:
+                    self.done.emit({"status": "error", "message": "No downloadable assets found."})
+                    return
+                self.download_url = url
+                self.done.emit({
+                    "status": "new_version",
+                    "latest_version": latest_version,
+                    "download_url": self.download_url,
+                    "notes": self.release_notes
+                })
             else:
-                self.finished.emit({"status": "latest"})
+                self.done.emit({"status": "latest", "latest_version": latest_version})
+        except requests.Timeout:
+            self.done.emit({"status": "error", "message": "Update check timed out."})
         except requests.RequestException as e:
-            self.finished.emit({"status": "error", "message": str(e)})
+            self.done.emit({"status": "error", "message": f"Network error: {e}"})
         except ValueError as e:
-            self.finished.emit({"status": "error", "message": f"JSON parsing error: {str(e)}"})
+            self.done.emit({"status": "error", "message": f"JSON parsing error: {e}"})
+        except Exception as e:
+            self.done.emit({"status": "error", "message": str(e)})
 
 
 class UpdateDownloadThread(QThread):
     progress = pyqtSignal(int)
-    finished = pyqtSignal(dict)
+    done = pyqtSignal(dict)
 
     def __init__(self, url):
         super().__init__()
         self.url = url
+        self._abort = False
+
+    def abort(self):
+        self._abort = True
 
     def run(self):
         try:
-            response = requests.get(self.url, stream=True)
-            response.raise_for_status()
-            total_length = response.headers.get('content-length')
+            with requests.get(self.url, stream=True, timeout=10) as response:
+                response.raise_for_status()
+                total_length = response.headers.get('content-length')
+                if total_length is None:
+                    self.done.emit({"status": "error", "message": "Unable to determine file size."})
+                    return
 
-            if total_length is None:
-                self.finished.emit({"status": "error", "message": "Unable to determine file size."})
-                return
+                total_length = int(total_length)
+                downloaded = 0
+                new_file_path = os.path.join(tempfile.gettempdir(), "adb_manager_update.new")
 
-            total_length = int(total_length)
-            downloaded = 0
-            new_file_path = sys.argv[0] + ".new"
+                with open(new_file_path, "wb") as file:
+                    for data in response.iter_content(chunk_size=64 * 1024):
+                        if self._abort:
+                            self.done.emit({"status": "error", "message": "Download cancelled."})
+                            try:
+                                os.remove(new_file_path)
+                            except Exception:
+                                pass
+                            return
+                        if not data:
+                            continue
+                        downloaded += len(data)
+                        file.write(data)
+                        self.progress.emit(int(100 * downloaded / total_length))
 
-            with open(new_file_path, "wb") as file:
-                for data in response.iter_content(chunk_size=4096):
-                    downloaded += len(data)
-                    file.write(data)
-                    self.progress.emit(int(100 * downloaded / total_length))
-
-            self.finished.emit({"status": "success", "file_path": new_file_path})
+            self.done.emit({"status": "success", "file_path": new_file_path})
+        except requests.Timeout:
+            self.done.emit({"status": "error", "message": "Download timed out."})
         except requests.RequestException as e:
-            self.finished.emit({"status": "error", "message": str(e)})
+            self.done.emit({"status": "error", "message": f"Network error: {e}"})
+        except Exception as e:
+            self.done.emit({"status": "error", "message": str(e)})

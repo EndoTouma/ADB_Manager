@@ -19,7 +19,7 @@ def get_device_status():
     device_status = {}
     devices = []
     for line in device_lines:
-        if line.strip():  # игнорируем пустые строки
+        if line.strip():
             parts = line.split("\t")
             if len(parts) == 2:
                 device, status = parts

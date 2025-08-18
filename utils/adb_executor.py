@@ -1,65 +1,126 @@
+import os
+import shlex
+import shutil
+import sys
 import subprocess
 import time
+from typing import List, Optional
+
 import chardet
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QThread, pyqtSignal
 
 
-def decode_output(output_bytes):
-    detected_encoding = chardet.detect(output_bytes)['encoding'] or 'utf-8'
-    return output_bytes.decode(detected_encoding, errors='replace')
-
-
-def execute_adb_command(device, command, output_text_widget):
-    execution_time = 0
+def _decode_bytes(output_bytes: Optional[bytes]) -> str:
+    if not output_bytes:
+        return ""
+    detected = chardet.detect(output_bytes) or {}
+    enc = detected.get("encoding") or "utf-8"
     try:
-        output_text_widget.append(f"\n<strong>Executing</strong> '{command}' on device: {device}\n")
+        return output_bytes.decode(enc, errors="replace")
+    except Exception:
+        return output_bytes.decode("utf-8", errors="replace")
+
+
+def _adb_exists() -> bool:
+    return shutil.which("adb") is not None or os.path.exists(os.path.join(os.getcwd(), "adb.exe"))
+
+def _windows_startupinfo():
+    if sys.platform.startswith("win"):
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        return si
+    return None
+
+
+def _creationflags_no_window() -> int:
+    if sys.platform.startswith("win"):
+        return getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return 0
+
+
+def _build_adb_args(device: str, command) -> List[str]:
+    if isinstance(command, list):
+        cmd_parts = command
+    else:
+        command = (command or "").strip()
+        try:
+            cmd_parts = shlex.split(command, posix=False)
+        except ValueError:
+            cmd_parts = command.split()
+
+    cmd_parts = [p.strip('"').strip("'") for p in cmd_parts]
+
+    device = (device or "").strip()
+
+    if not cmd_parts:
+        return ["adb"]
+
+    verb = cmd_parts[0].lower()
+    if verb in ("connect", "disconnect"):
+        if len(cmd_parts) == 1 and device:
+            return ["adb", verb, device]
+        return ["adb"] + cmd_parts
+
+    return ["adb", "-s", device] + cmd_parts
+
+class ADBWorker(QThread):
+    output_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(float, bool)
+
+    def __init__(self, device: str, command: str | list, timeout: float = 120.0, parent=None):
+        super().__init__(parent)
+        self.device = device
+        self.command = command
+        self.timeout = timeout
+        self._cancel_requested = False
+
+    def cancel(self):
+        self._cancel_requested = True
+
+    def run(self):
+        if not _adb_exists():
+            self.output_signal.emit("ERROR: adb executable not found in PATH.")
+            self.finished_signal.emit(0.0, False)
+            return
+
+        args = _build_adb_args(self.device, self.command)
         
-        if command.startswith("connect"):
-            adb_command = f"adb {command} {device}"
-        elif command.startswith("disconnect"):
-            adb_command = f"adb {command} {device}"
-        else:
-            adb_command = f"adb -s {device} {command}"
-        
+        if len(args) >= 2 and args[1] == "install":
+            apk_path = next((a.strip('"').strip("'") for a in args[2:] if a.lower().endswith(".apk")), None)
+            if not apk_path or not os.path.exists(apk_path):
+                self.output_signal.emit(f"ERROR: APK file not found: {apk_path or '(none)'}")
+                self.finished_signal.emit(0.0, False)
+                return
+
         start_time = time.time()
-        
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        
-        process = subprocess.Popen(
-            adb_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            startupinfo=startupinfo, creationflags=subprocess.CREATE_NO_WINDOW
-        )
-        output, error = process.communicate()
-        
-        end_time = time.time()
-        execution_time = round(end_time - start_time, 2)
-        
-        message = error if error else output
-        output_text_widget.append(f"<strong>Result</strong>: {decode_output(message)}\n")
-    
-    except Exception as e:
-        error_dialog = QMessageBox()
-        error_dialog.setIcon(QMessageBox.Icon.Critical)
-        error_dialog.setWindowTitle("Error")
-        error_dialog.setText("An error occurred while attempting to execute the ADB command.")
-        error_dialog.setInformativeText(str(e))
-        error_dialog.addButton(QMessageBox.StandardButton.Ok)
-        error_dialog.exec()
-    
-    return execution_time
+        try:
+            proc = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                bufsize=1,
+                universal_newlines=True,
+                startupinfo=_windows_startupinfo(),
+                creationflags=_creationflags_no_window(),
+            )
+            
+            for raw_line in proc.stdout:
+                line = _decode_bytes(raw_line.encode() if isinstance(raw_line, str) else raw_line)
+                if self._cancel_requested:
+                    proc.kill()
+                    self.output_signal.emit("Cancelled by user.")
+                    self.finished_signal.emit(round(time.time() - start_time, 2), False)
+                    return
+                self.output_signal.emit(line.rstrip())
 
+            proc.wait(self.timeout)
+            success = proc.returncode == 0
 
-def execute_adb_commands(device, command):
-    try:
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        
-        result = subprocess.run(['adb', '-s', device] + command.split(), capture_output=True, text=True,
-                                startupinfo=startupinfo)
-        if result.returncode == 0:
-            return result.stdout
-        else:
-            raise Exception(result.stderr)
-    except subprocess.CalledProcessError as e:
-        raise Exception(f"Error executing command: {str(e)}")
+        except subprocess.TimeoutExpired:
+            self.output_signal.emit(f"ERROR: Timeout after {self.timeout}s")
+            success = False
+        except Exception as e:
+            self.output_signal.emit(f"ERROR: {e}")
+            success = False
+
+        self.finished_signal.emit(round(time.time() - start_time, 2), success)

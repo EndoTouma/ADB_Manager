@@ -1,64 +1,148 @@
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontMetrics
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QScrollArea, QWidget, QCheckBox, QDialogButtonBox, QPushButton
+from PyQt6.QtCore import Qt, QTimer, QSettings
+from PyQt6.QtGui import QKeySequence
+from PyQt6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem,
+    QDialogButtonBox, QPushButton, QLabel, QWidget, QSizePolicy, QMessageBox
+)
 
 
 class DeleteCommandDialog(QDialog):
-    def __init__(self, commands, parent=None):
+
+    SETTINGS_ORG = "ADBManager"
+    SETTINGS_APP = "ADBManagerApp"
+    SETTINGS_KEY = "DeleteCommandDialog/geometry"
+
+    def __init__(self, commands: list[str], parent: QWidget | None = None):
         super().__init__(parent)
         self.setWindowTitle("Delete Commands")
-        self.commands = commands
-        self.checkboxes = []
+        self.setModal(True)
 
-        layout = QVBoxLayout(self)
-        self.setup_scroll_area(layout)
-        self.setup_buttons(layout)
-        self.setLayout(layout)
+        self._commands = commands[:]  # копия
+        self._debounce = QTimer(self)
+        self._debounce.setSingleShot(True)
+        self._debounce.setInterval(150)
+        self._debounce.timeout.connect(self._apply_filter)
 
-        self.setMinimumWidth(400)
-        self.setMaximumWidth(self.calculate_max_checkbox_width())
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(8)
 
-    def setup_scroll_area(self, parent_layout):
-        scroll_area = QScrollArea(self)
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
-        scroll_area.setWidget(scroll_widget)
-        scroll_area.setWidgetResizable(True)
-        parent_layout.addWidget(scroll_area)
+        search_row = QHBoxLayout()
+        self.search_edit = QLineEdit(self)
+        self.search_edit.setPlaceholderText("Filter commands...")
+        self.search_edit.textChanged.connect(lambda _: self._debounce.start())
+        clear_btn = QPushButton("Clear", self)
+        clear_btn.clicked.connect(self.search_edit.clear)
+        search_row.addWidget(QLabel("Search:", self))
+        search_row.addWidget(self.search_edit, 1)
+        search_row.addWidget(clear_btn)
+        root.addLayout(search_row)
 
-        self.checkboxes = [QCheckBox(command) for command in self.commands]
-        for checkbox in self.checkboxes:
-            checkbox.setFixedHeight(20)
-            scroll_layout.addWidget(checkbox)
+        self.list_widget = QListWidget(self)
+        self.list_widget.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        self.list_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        root.addWidget(self.list_widget, 1)
 
-    def calculate_max_checkbox_width(self):
-        max_width = 350
-        metrics = QFontMetrics(self.font())
-        for checkbox in self.checkboxes:
-            text_width = metrics.boundingRect(checkbox.text()).width()
-            max_width = max(max_width, text_width)
-        max_width += 50
-        return max_width
+        select_row = QHBoxLayout()
+        self.btn_all = QPushButton("Select All", self)
+        self.btn_none = QPushButton("Select None", self)
+        self.btn_invert = QPushButton("Invert", self)
+        self.btn_all.clicked.connect(self.select_all_commands)
+        self.btn_none.clicked.connect(self.select_none_commands)
+        self.btn_invert.clicked.connect(self.invert_selection)
+        select_row.addWidget(self.btn_all)
+        select_row.addWidget(self.btn_none)
+        select_row.addWidget(self.btn_invert)
+        select_row.addStretch(1)
+        root.addLayout(select_row)
 
-    def setup_buttons(self, parent_layout):
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            self
+        )
+        self.button_box.accepted.connect(self._on_accept)
+        self.button_box.rejected.connect(self.reject)
+        root.addWidget(self.button_box)
 
-        select_all_button = QPushButton("Select All")
-        select_all_button.clicked.connect(self.select_all_commands)
+        self._populate(self._commands)
+        self._update_ok_enabled()
 
-        buttons_layout = QVBoxLayout()
-        buttons_layout.addWidget(select_all_button)
-        buttons_layout.addWidget(button_box)
+        self._restore_geometry()
 
-        parent_layout.addLayout(buttons_layout)
-        parent_layout.setAlignment(button_box, Qt.AlignmentFlag.AlignRight)
-    
+        self.list_widget.itemChanged.connect(lambda _: self._update_ok_enabled())
+
+        self.resize(520, 420)
+
+    def _restore_geometry(self):
+        s = QSettings(self.SETTINGS_ORG, self.SETTINGS_APP)
+        geom = s.value(self.SETTINGS_KEY)
+        if geom:
+            self.restoreGeometry(geom)
+
+    def closeEvent(self, e):
+        s = QSettings(self.SETTINGS_ORG, self.SETTINGS_APP)
+        s.setValue(self.SETTINGS_KEY, self.saveGeometry())
+        super().closeEvent(e)
+
+    def _populate(self, items: list[str]):
+        self.list_widget.blockSignals(True)
+        self.list_widget.clear()
+        for cmd in items:
+            it = QListWidgetItem(cmd, self.list_widget)
+            it.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+            it.setCheckState(Qt.CheckState.Unchecked)
+        self.list_widget.blockSignals(False)
+
+    def _apply_filter(self):
+        query = self.search_edit.text().strip().lower()
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            text = item.text().lower()
+            is_match = (query in text) if query else True
+            item.setHidden(not is_match)
+
     def select_all_commands(self):
-        all_selected = all(checkbox.isChecked() for checkbox in self.checkboxes)
-        for checkbox in self.checkboxes:
-            checkbox.setChecked(not all_selected)
-    
-    def get_selected_commands(self):
-        return [cb.text() for cb in self.checkboxes if cb.isChecked()]
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if not item.isHidden():
+                item.setCheckState(Qt.CheckState.Checked)
+        self._update_ok_enabled()
+
+    def select_none_commands(self):
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if not item.isHidden():
+                item.setCheckState(Qt.CheckState.Unchecked)
+        self._update_ok_enabled()
+
+    def invert_selection(self):
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if not item.isHidden():
+                item.setCheckState(
+                    Qt.CheckState.Unchecked if item.checkState() == Qt.CheckState.Checked
+                    else Qt.CheckState.Checked
+                )
+        self._update_ok_enabled()
+
+    def _update_ok_enabled(self):
+        any_checked = any(
+            self.list_widget.item(i).checkState() == Qt.CheckState.Checked
+            for i in range(self.list_widget.count())
+            if not self.list_widget.item(i).isHidden()
+        )
+        self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(any_checked)
+
+    def _on_accept(self):
+        if not self.get_selected_commands():
+            QMessageBox.information(self, "Delete Commands", "Please select at least one command.")
+            return
+        self.accept()
+
+    def get_selected_commands(self) -> list[str]:
+        selected = []
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected.append(item.text())
+        return selected

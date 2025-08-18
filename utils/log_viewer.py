@@ -1,8 +1,7 @@
 import logging
 from PyQt6.QtCore import Qt, QRegularExpression
-from PyQt6.QtGui import QTextCursor, QTextCharFormat, QSyntaxHighlighter, QColor
+from PyQt6.QtGui import QTextCursor, QTextCharFormat, QSyntaxHighlighter, QColor, QTextDocument
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QHBoxLayout, QLineEdit, QPushButton
-
 
 class LogViewerDialog(QDialog):
     def __init__(self, log_text, parent=None):
@@ -39,7 +38,8 @@ class LogViewerDialog(QDialog):
         search_layout = QHBoxLayout()
 
         self.search_input = QLineEdit(self)
-        self.search_input.setPlaceholderText("Search...")
+        self.search_input.setPlaceholderText("Search…")
+        self.search_input.returnPressed.connect(self.search_text)
         self.search_input.textChanged.connect(self.update_button_states)
         search_layout.addWidget(self.search_input)
 
@@ -91,34 +91,39 @@ class LogViewerDialog(QDialog):
             logging.debug(f'Found positions: {self.highlight_positions}')
         else:
             logging.debug('No matches found.')
-
+    
     def filter_text(self):
         search_text = self.search_input.text().strip()
         if search_text:
             self.filtered_log_text = '\n'.join(
-                line for line in self.log_text.split('\n') if search_text in line)
+                line for line in self.log_text.splitlines() if search_text in line
+            )
             self.log_viewer.setPlainText(self.filtered_log_text)
+            self.search_text()
         else:
             self.log_viewer.setPlainText(self.log_text)
-
+    
     def clear_filter(self):
         self.log_viewer.setPlainText(self.log_text)
-        self.search_input.clear()
+        if self.highlight_text:
+            self.search_text()
+        else:
+            self.search_input.clear()
         self.update_button_states()
-
+    
     def find_all(self):
         self.highlight_positions = []
         document = self.log_viewer.document()
         cursor = QTextCursor(document)
-
+        
         while True:
             cursor = document.find(self.highlight_text, cursor)
             if cursor.isNull():
                 break
             self.highlight_positions.append(cursor.position())
-
+        
         self.highlight_search_results()
-
+    
     def find_next(self):
         if not self.highlight_positions:
             logging.debug('No highlight positions available for "Next".')
@@ -144,23 +149,35 @@ class LogViewerDialog(QDialog):
         cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, len(self.highlight_text))
         self.log_viewer.setTextCursor(cursor)
         self.log_viewer.ensureCursorVisible()
-
+    
     def highlight_search_results(self):
+        if not self.highlight_positions or not self.highlight_text:
+            self.log_viewer.setExtraSelections([])
+            return
+        
         extra_selections = []
-        cursor = QTextCursor(self.log_viewer.document())
-        format = QTextCharFormat()
-        format.setBackground(QColor(Qt.GlobalColor.yellow))
-
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor(Qt.GlobalColor.yellow))
+        
+        doc = self.log_viewer.document()
         for pos in self.highlight_positions:
+            cursor = QTextCursor(doc)
             cursor.setPosition(pos - len(self.highlight_text), QTextCursor.MoveMode.MoveAnchor)
-            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, len(self.highlight_text))
-
-            extra_selection = QTextEdit.ExtraSelection()
-            extra_selection.cursor = cursor
-            extra_selection.format = format
-            extra_selections.append(extra_selection)
-
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor,
+                                len(self.highlight_text))
+            
+            sel = QTextEdit.ExtraSelection()
+            sel.cursor = cursor
+            sel.format = fmt
+            extra_selections.append(sel)
+        
         self.log_viewer.setExtraSelections(extra_selections)
+    
+    def _make_cursor_at(self, pos):
+        cursor = QTextCursor(self.log_viewer.document())
+        cursor.setPosition(pos - len(self.highlight_text), QTextCursor.MoveMode.MoveAnchor)
+        cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, len(self.highlight_text))
+        return cursor
 
 
 class LogHighlighter(QSyntaxHighlighter):
@@ -168,26 +185,41 @@ class LogHighlighter(QSyntaxHighlighter):
         super().__init__(document)
         self.highlighting_rules = []
 
+        # Timestamp
         timestamp_format = QTextCharFormat()
+        timestamp_format.setForeground(QColor("#888888"))
         self.highlighting_rules.append(
-            (QRegularExpression("\\b\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\b"), timestamp_format))
+            (QRegularExpression(r"\b\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\b"), timestamp_format)
+        )
 
-        log_level_format = QTextCharFormat()
-        log_levels = ["D", "I", "W", "E", "F", "V"]
-        for level in log_levels:
-            self.highlighting_rules.append((QRegularExpression("\\b" + level + "\\b(?=\\s)"), log_level_format))
+        log_level_colors = {
+            "E": "#ff4c4c",  # красный
+            "W": "#ffc66d",  # желтый
+            "I": "#6a8759",  # зеленый
+            "D": "#6897bb",  # синий
+            "V": "#a9b7c6"   # серый
+        }
+        for level, color in log_level_colors.items():
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor(color))
+            self.highlighting_rules.append(
+                (QRegularExpression(rf"\b{level}\b(?=\s)"), fmt)
+            )
 
+        # Сообщение
         message_format = QTextCharFormat()
-        self.highlighting_rules.append((QRegularExpression(":.*"), message_format))
-
+        self.highlighting_rules.append(
+            (QRegularExpression(r":.*"), message_format)
+        )
+    
     def highlightBlock(self, text):
         for pattern, fmt in self.highlighting_rules:
-            expression = QRegularExpression(pattern)
-            match_iterator = expression.globalMatch(text)
-            while match_iterator.hasNext():
-                match = match_iterator.next()
-                self.setFormat(match.capturedStart(), match.capturedLength(), fmt)
-
+            it = pattern.globalMatch(text)
+            while it.hasNext():
+                match = it.next()
+                self.setFormat(match.capturedStart(),
+                               match.capturedLength(),
+                               fmt)
 
 def run_log_viewer(log_text):
     viewer = LogViewerDialog(log_text)
