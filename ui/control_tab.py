@@ -1,4 +1,5 @@
 import subprocess
+import math
 from datetime import datetime
 
 from PyQt6.QtCore import Qt
@@ -49,14 +50,18 @@ class ControlTab(QWidget):
         
         self.init_ui()
         
-        self.update_device_grid(self.devices)
         self.check_device_status()
         
         self.setAcceptDrops(True)
     
     def init_ui(self):
         layout_control = QVBoxLayout(self)
+        
+        # список устройств в отдельной группе
         layout_control.addWidget(self.create_group("Available Devices", self.devices_ui()))
+        # КНОПКИ ВНЕ СПИСКА (отдельная группа)
+        layout_control.addWidget(self.create_group("Device Actions", self.devices_actions_ui()))
+        
         layout_control.addWidget(self.create_group("ADB Commands", self.commands_ui()))
         layout_control.addWidget(self.create_group("Output", self.output_ui()))
         
@@ -73,7 +78,6 @@ class ControlTab(QWidget):
         logcat_button_layout.addWidget(self.logcat_button)
         logcat_button_layout.addWidget(self.logcat_file_button)
         logcat_button_layout.addWidget(self.stop_logcat_button)
-        
         layout_control.addLayout(logcat_button_layout)
         
         button_layout = QHBoxLayout()
@@ -210,63 +214,80 @@ class ControlTab(QWidget):
     def update_device_grid(self, devices=None, remove_device_combo_box=None):
         if devices is None:
             devices = self.devices
-        
         self.devices = sorted(devices)
         
+        columns = 3
+        
+        # Запомним выбор и позицию скролла
+        prev_selected = self._get_selected_devices()
+        prev_scroll = self.devices_scroll.verticalScrollBar().value() if hasattr(self, "devices_scroll") else None
+        
+        # Очистим контейнер
         if self.devices_grid is None:
             self.devices_grid = QVBoxLayout()
-        
         while self.devices_grid.count():
             item = self.devices_grid.takeAt(0)
             w = item.widget()
             if w is not None:
                 w.deleteLater()
         
+        # Группируем
         groups_map = {}
         for dev in self.devices:
-            group = self.device_groups.get(dev, "Ungrouped")
-            groups_map.setdefault(group, []).append(dev)
+            groups_map.setdefault(self.device_groups.get(dev, "Ungrouped"), []).append(dev)
         
         self.group_names_cache = set(self.device_groups.values())
         self.device_checkboxes = []
         
+        # Рисуем группы
         for group_name in sorted(groups_map.keys(), key=lambda s: (s != "Ungrouped", s.lower())):
             group_box = QGroupBox(f"{group_name} ({len(groups_map[group_name])})")
+            group_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+            
             grid = QGridLayout()
+            grid.setHorizontalSpacing(10)
+            grid.setVerticalSpacing(6)
+            grid.setContentsMargins(8, 8, 8, 8)
+            for c in range(columns):
+                grid.setColumnStretch(c, 1)
             
-            devs = groups_map[group_name]
-            for index, dev in enumerate(devs):
+            for index, dev in enumerate(groups_map[group_name]):
                 cb = QCheckBox(dev)
+                cb.setMinimumWidth(0)  # не мешаем сжиматься на маленьких окнах
+                cb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
                 self.device_checkboxes.append(cb)
-                row, col = divmod(index, 4)
-                grid.addWidget(cb, row, col)
-            
-            controls = QHBoxLayout()
-            select_btn = QPushButton("Select group")
-            unselect_btn = QPushButton("Unselect group")
-            
-            def make_select(devices_in_group):
-                return lambda: [cb.setChecked(True) for cb in self.device_checkboxes if cb.text() in devices_in_group]
-            
-            def make_unselect(devices_in_group):
-                return lambda: [cb.setChecked(False) for cb in self.device_checkboxes if cb.text() in devices_in_group]
-            
-            select_btn.clicked.connect(make_select(devs))
-            unselect_btn.clicked.connect(make_unselect(devs))
-            controls.addWidget(select_btn)
-            controls.addWidget(unselect_btn)
+                r, c = divmod(index, columns)
+                grid.addWidget(cb, r, c)
             
             outer_v = QVBoxLayout()
             outer_v.addLayout(grid)
-            outer_v.addLayout(controls)
             group_box.setLayout(outer_v)
-            
             self.devices_grid.addWidget(group_box)
+        
+        tail = QWidget()
+        tail.setFixedHeight(1)
+        self.devices_grid.addWidget(tail)
+        
+        self._restore_selected_devices(prev_selected)
+        if prev_scroll is not None:
+            self.devices_scroll.verticalScrollBar().setValue(prev_scroll)
         
         if remove_device_combo_box:
             remove_device_combo_box.clear()
             remove_device_combo_box.addItems(self.devices)
             remove_device_combo_box.setCurrentIndex(-1)
+    
+    def _update_devices_scroll_height(self, columns: int, groups_map: dict):
+        """
+        Упрощённый вариант: убираем любые ограничения по высоте,
+        чтобы QScrollArea всегда прокручивался до самого низа.
+        """
+        if hasattr(self, "devices_scroll") and self.devices_scroll:
+            self.devices_scroll.setMinimumHeight(0)
+            self.devices_scroll.setMaximumHeight(16777215)
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
     
     @staticmethod
     def is_device_connected(device):
@@ -275,53 +296,57 @@ class ControlTab(QWidget):
     
     def devices_ui(self):
         """
-        Возвращает *виджет* с прокручиваемой зоной для групп устройств и
-        нижней панелью кнопок (assign/reset/select-all/refresh).
+        Прокручиваемая зона для групп устройств (без кнопок).
         """
         container = QWidget()
         vbox = QVBoxLayout(container)
         
         self.devices_grid = QVBoxLayout()
+        self.devices_grid.setSpacing(8)
+        
         grid_container = QWidget()
         grid_container.setLayout(self.devices_grid)
+        # Ключевые политики для корректного расчёта высоты контента
+        grid_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         
         scroll = QScrollArea()
+        self.devices_scroll = scroll
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setWidget(grid_container)
+        # Скролл не ограничиваем по высоте вообще
+        scroll.setMinimumHeight(0)
+        scroll.setMaximumHeight(16777215)
         
-        try:
-            screen_h = QApplication.primaryScreen().availableGeometry().height()
-        except Exception:
-            screen_h = 900
-        min_h = max(240, int(screen_h * 0.35))
-        max_h = int(screen_h * 0.60)
-        scroll.setMinimumHeight(min(min_h, max_h))
         vbox.addWidget(scroll)
-        
-        first_row_button_layout = QHBoxLayout()
-        vbox.addLayout(first_row_button_layout)
-        
-        second_row_button_layout = QHBoxLayout()
+        return container
+    
+    def devices_actions_ui(self):
+        """
+        Панель действий над устройствами (вынесена из области прокрутки).
+        """
+        actions = QWidget()
+        h = QHBoxLayout(actions)
         
         assign_group_btn = QPushButton('Assign Group')
         assign_group_btn.clicked.connect(self.assign_group_for_selected)
-        second_row_button_layout.addWidget(assign_group_btn)
+        h.addWidget(assign_group_btn)
         
         reset_group_btn = QPushButton('Reset Group')
         reset_group_btn.clicked.connect(self.reset_group_for_selected)
-        second_row_button_layout.addWidget(reset_group_btn)
+        h.addWidget(reset_group_btn)
         
         select_all_button = QPushButton('Select All')
         select_all_button.clicked.connect(self.select_all_devices)
-        second_row_button_layout.addWidget(select_all_button)
+        h.addWidget(select_all_button)
         
         refresh_button = QPushButton('Refresh Status')
         refresh_button.clicked.connect(self.refresh_device_list)
-        second_row_button_layout.addWidget(refresh_button)
+        h.addWidget(refresh_button)
         
-        vbox.addLayout(second_row_button_layout)
-        
-        return container
+        h.addStretch(1)
+        return actions
     
     def _get_selected_devices(self):
         return [cb.text() for cb in self.device_checkboxes if cb.isChecked()]
