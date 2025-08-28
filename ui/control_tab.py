@@ -1,8 +1,7 @@
 import subprocess
-import math
 from datetime import datetime
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QProcess
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QGridLayout,
     QFileDialog, QMessageBox, QProgressDialog, QApplication,
@@ -57,9 +56,7 @@ class ControlTab(QWidget):
     def init_ui(self):
         layout_control = QVBoxLayout(self)
         
-        # список устройств в отдельной группе
         layout_control.addWidget(self.create_group("Available Devices", self.devices_ui()))
-        # КНОПКИ ВНЕ СПИСКА (отдельная группа)
         layout_control.addWidget(self.create_group("Device Actions", self.devices_actions_ui()))
         
         layout_control.addWidget(self.create_group("ADB Commands", self.commands_ui()))
@@ -218,11 +215,9 @@ class ControlTab(QWidget):
         
         columns = 3
         
-        # Запомним выбор и позицию скролла
         prev_selected = self._get_selected_devices()
         prev_scroll = self.devices_scroll.verticalScrollBar().value() if hasattr(self, "devices_scroll") else None
         
-        # Очистим контейнер
         if self.devices_grid is None:
             self.devices_grid = QVBoxLayout()
         while self.devices_grid.count():
@@ -231,7 +226,6 @@ class ControlTab(QWidget):
             if w is not None:
                 w.deleteLater()
         
-        # Группируем
         groups_map = {}
         for dev in self.devices:
             groups_map.setdefault(self.device_groups.get(dev, "Ungrouped"), []).append(dev)
@@ -239,7 +233,6 @@ class ControlTab(QWidget):
         self.group_names_cache = set(self.device_groups.values())
         self.device_checkboxes = []
         
-        # Рисуем группы
         for group_name in sorted(groups_map.keys(), key=lambda s: (s != "Ungrouped", s.lower())):
             group_box = QGroupBox(f"{group_name} ({len(groups_map[group_name])})")
             group_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
@@ -253,7 +246,7 @@ class ControlTab(QWidget):
             
             for index, dev in enumerate(groups_map[group_name]):
                 cb = QCheckBox(dev)
-                cb.setMinimumWidth(0)  # не мешаем сжиматься на маленьких окнах
+                cb.setMinimumWidth(0)
                 cb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
                 self.device_checkboxes.append(cb)
                 r, c = divmod(index, columns)
@@ -278,10 +271,6 @@ class ControlTab(QWidget):
             remove_device_combo_box.setCurrentIndex(-1)
     
     def _update_devices_scroll_height(self, columns: int, groups_map: dict):
-        """
-        Упрощённый вариант: убираем любые ограничения по высоте,
-        чтобы QScrollArea всегда прокручивался до самого низа.
-        """
         if hasattr(self, "devices_scroll") and self.devices_scroll:
             self.devices_scroll.setMinimumHeight(0)
             self.devices_scroll.setMaximumHeight(16777215)
@@ -295,9 +284,6 @@ class ControlTab(QWidget):
         return device in result.stdout
     
     def devices_ui(self):
-        """
-        Прокручиваемая зона для групп устройств (без кнопок).
-        """
         container = QWidget()
         vbox = QVBoxLayout(container)
         
@@ -306,7 +292,6 @@ class ControlTab(QWidget):
         
         grid_container = QWidget()
         grid_container.setLayout(self.devices_grid)
-        # Ключевые политики для корректного расчёта высоты контента
         grid_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         
         scroll = QScrollArea()
@@ -315,7 +300,6 @@ class ControlTab(QWidget):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setWidget(grid_container)
-        # Скролл не ограничиваем по высоте вообще
         scroll.setMinimumHeight(0)
         scroll.setMaximumHeight(16777215)
         
@@ -323,9 +307,6 @@ class ControlTab(QWidget):
         return container
     
     def devices_actions_ui(self):
-        """
-        Панель действий над устройствами (вынесена из области прокрутки).
-        """
         actions = QWidget()
         h = QHBoxLayout(actions)
         
@@ -344,6 +325,10 @@ class ControlTab(QWidget):
         refresh_button = QPushButton('Refresh Status')
         refresh_button.clicked.connect(self.refresh_device_list)
         h.addWidget(refresh_button)
+        
+        view_button = QPushButton('View Screen')
+        view_button.clicked.connect(self.view_screen_of_selected_devices)
+        h.addWidget(view_button)
         
         h.addStretch(1)
         return actions
@@ -538,7 +523,7 @@ class ControlTab(QWidget):
             f"{'Installing' if self.is_install_cmd_exec else 'Executing'} on 1 of {self.total_devices_exec}..."
         )
         self.progress_dialog.setCancelButtonText("Cancel")
-        self.progress_dialog.setRange(0, 0)  # бесконечная анимация
+        self.progress_dialog.setRange(0, 0)
         self.progress_dialog.setMinimumWidth(400)
         self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         self.progress_dialog.show()
@@ -692,3 +677,106 @@ class ControlTab(QWidget):
         self.output_text.append(f"<strong>Logcat finished for device: {device}</strong>\n")
         if device in self.logcat_threads:
             del self.logcat_threads[device]
+    
+    def view_screen_of_selected_devices(self):
+        import shutil, subprocess
+        from PyQt6.QtCore import QTimer
+        
+        scrcpy_path = shutil.which("scrcpy")
+        if not scrcpy_path:
+            QMessageBox.critical(self, "scrcpy not found", "Установите scrcpy (winget/choco/brew/apt).")
+            return
+        
+        selected = self._get_selected_devices()
+        if not selected:
+            QMessageBox.information(self, "No device selected", "Выберите хотя бы одно устройство.")
+            return
+        
+        self._scrcpy_processes = [p for p in getattr(self, "_scrcpy_processes", [])
+                                  if p.state() != QProcess.ProcessState.NotRunning]
+        
+        device_titles: dict[str, str] = {}
+        for dev in selected:
+            title = dev
+            try:
+                res = subprocess.run(
+                    ["adb", "-s", dev, "shell", "getprop", "ro.product.model"],
+                    capture_output=True, text=True, timeout=6
+                )
+                model = (res.stdout or "").strip()
+                if model:
+                    title = f"{model} ({dev})"
+            except Exception:
+                pass
+            device_titles[dev] = title
+        
+        base_x, base_y, step = 40, 40, 40
+        
+        retry_left: dict[str, int] = {dev: 2 for dev in selected}
+        
+        def start_one(idx: int, dev: str, delay_ms: int = 0):
+            
+            def _do_start():
+                p = QProcess(self)
+                p.setProgram(scrcpy_path)
+                args = [
+                    "-s", dev,
+                    "--max-size=800",
+                    "--max-fps=30",
+                    "--video-bit-rate=3M",
+                    "--video-buffer=60",
+                    "--no-clipboard-autosync",
+                    "-V", "error",
+                    "--window-title", device_titles.get(dev, dev),
+                    "--window-x", str(base_x + step * idx),
+                    "--window-y", str(base_y + step * idx),
+                ]
+                p.setArguments(args)
+                
+                def _on_err():
+                    data = bytes(p.readAllStandardError()).decode(errors="ignore")
+                    print(f"[{dev}] scrcpy ERR:", data)
+                
+                def _on_out():
+                    data = bytes(p.readAllStandardOutput()).decode(errors="ignore")
+                    print(f"[{dev}] scrcpy OUT:", data)
+                
+                p.readyReadStandardError.connect(_on_err)
+                p.readyReadStandardOutput.connect(_on_out)
+                
+                def _on_finished(code, status):
+                    nonlocal retry_left
+                    err_tail = bytes(p.readAllStandardError()).decode(errors="ignore")
+                    out_tail = bytes(p.readAllStandardOutput()).decode(errors="ignore")
+                    text = (err_tail + "\n" + out_tail).lower()
+                    
+                    if code != 0 and "connection refused" in text and retry_left.get(dev, 0) > 0:
+                        left = retry_left[dev] - 1
+                        retry_left[dev] = left
+                        backoff = 700 * (2 - left)  # 700ms → 1400ms
+                        print(f"[{dev}] scrcpy retry due to 'Connection refused' (left={left}) in {backoff} ms")
+                        QTimer.singleShot(backoff, lambda: start_one(idx, dev))
+                        return
+                    
+                    print(f"[{dev}] scrcpy finished rc={code}")
+                
+                p.finished.connect(_on_finished)
+                
+                p.start()
+                if p.waitForStarted(3000):
+                    self._scrcpy_processes.append(p)
+                else:
+                    if retry_left.get(dev, 0) > 0:
+                        left = retry_left[dev] - 1
+                        retry_left[dev] = left
+                        print(f"[{dev}] scrcpy failed to start, retry in 1000 ms (left={left})")
+                        QTimer.singleShot(1000, lambda: start_one(idx, dev))
+                    else:
+                        QMessageBox.warning(self, "scrcpy", f"Не удалось запустить scrcpy для {dev}.")
+            
+            if delay_ms > 0:
+                QTimer.singleShot(delay_ms, _do_start)
+            else:
+                _do_start()
+        for idx, dev in enumerate(selected):
+            start_one(idx, dev, delay_ms=600 * idx)

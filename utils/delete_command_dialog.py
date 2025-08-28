@@ -1,5 +1,4 @@
 from PyQt6.QtCore import Qt, QTimer, QSettings
-from PyQt6.QtGui import QKeySequence
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem,
     QDialogButtonBox, QPushButton, QLabel, QWidget, QSizePolicy, QMessageBox

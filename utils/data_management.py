@@ -199,3 +199,38 @@ class DataManager:
             )
         else:
             print(f"Device '{device_to_delete}' not found in data.")
+            
+    @staticmethod
+    def load_ssh_connections(filename: str = "adb_data.json") -> list[dict]:
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            conns = data.get("ssh_connections", [])
+            norm = []
+            for c in conns:
+                try:
+                    norm.append({
+                        "name": c.get("name", ""),
+                        "host": c["host"],
+                        "port": int(c.get("port", 22)),
+                        "user": c.get("user") or "Administrator",
+                        "password": c.get("password", ""),
+                        "hostkey": c.get("hostkey", ""),
+                    })
+                
+                except Exception:
+                    pass
+            return norm
+        except Exception:
+            return []
+
+    @staticmethod
+    def save_ssh_connections(connections: list[dict], filename: str = "adb_data.json") -> None:
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            existing = {}
+        existing["ssh_connections"] = connections or []
+        _atomic_write_json(filename, existing)
+        DataManager.log_file_contents(filename)

@@ -9,7 +9,7 @@ class LogcatThread(QThread):
     def __init__(self, device: str, log_level: str = "V", output_file: str | None = None):
         super().__init__()
         self.device = device
-        self.log_level = (log_level or "V").strip().upper()  # 'V','D','I','W','E','F'
+        self.log_level = (log_level or "V").strip().upper()
         self.output_file = output_file
         self._running = False
         self._proc: subprocess.Popen | None = None

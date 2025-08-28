@@ -2,12 +2,14 @@ from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QIcon, QAction, QKeySequence
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTabWidget, QApplication, QHBoxLayout,
-    QLabel, QMenuBar, QMessageBox
+    QLabel, QMenuBar, QMessageBox, QTabBar, QDialog
 )
 
 from ui.about_tab import AboutTab
 from ui.control_tab import ControlTab
 from utils.data_management import DataManager
+from ui.remote_control_tab import RemoteControlTab
+from ui.ssh_connect_dialog import SSHConnectDialog
 
 APP_ORG = "ADBTools"
 APP_NAME = "ADB Manager"
@@ -30,6 +32,8 @@ class ADBManager(QWidget):
         self.status_label = QLabel("Ready")
         self.tabs = QTabWidget()
         self.menubar = QMenuBar()
+        self._plus_tab_index = -1
+        self._ssh_tabs = {}
 
         self.settings = QSettings(APP_ORG, APP_NAME)
 
@@ -41,13 +45,18 @@ class ADBManager(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self._on_tab_close_requested)
+        self.tabs.currentChanged.connect(self._on_tab_changed)
 
         self.tabs.addTab(self.tab_control, "Control")
         self.tabs.addTab(QWidget(), "About")
-        self.tabs.currentChanged.connect(self._on_tab_changed)
+
+        self._ensure_single_plus()
+        self._hide_close_icon_for_protected_tabs()
 
         layout.addWidget(self.menubar)
-
         layout.addWidget(self.tabs)
 
         status_bar = QHBoxLayout()
@@ -99,7 +108,7 @@ class ADBManager(QWidget):
 
     def _restart_adb_action(self):
         try:
-            from subprocess import run, CalledProcessError
+            from subprocess import run
             run(["adb", "kill-server"], check=True)
             run(["adb", "start-server"], check=True)
             self.set_status("ADB server restarted")
@@ -113,26 +122,36 @@ class ADBManager(QWidget):
         self.tabs.setCurrentIndex(idx)
 
     def _on_tab_changed(self, index: int):
+        if index == self._plus_tab_index:
+            self._create_ssh_tab_via_dialog()
+            return
+
         if index == 1 and self._tab_about_cached is None:
             self._tab_about_cached = AboutTab()
             self.tabs.removeTab(1)
-            self.tabs.addTab(self._tab_about_cached, "About")
+            self.tabs.insertTab(1, self._tab_about_cached, "About")
             self.tabs.setCurrentIndex(1)
-        self.set_status(f"Active tab: {self.tabs.tabText(index)}")
 
+        self.set_status(f"Active tab: {self.tabs.tabText(index)}")
+        self._hide_close_icon_for_protected_tabs()
+    
     def set_status(self, text: str):
         self.status_label.setText(text)
 
     def restore_state(self):
-        geo = self.settings.value("window/geometry")
-        if geo:
-            self.restoreGeometry(geo)
-        else:
+        try:
+            geo = self.settings.value("window/geometry", None)
+            if isinstance(geo, (bytes, bytearray)):
+                self.restoreGeometry(geo)
+        except Exception:
             pass
 
-        idx = int(self.settings.value("tabs/last_index", 0))
-        if 0 <= idx < self.tabs.count():
-            self.tabs.setCurrentIndex(idx)
+        try:
+            idx = int(self.settings.value("tabs/last_index", 0))
+            if 0 <= idx < self.tabs.count():
+                self.tabs.setCurrentIndex(idx)
+        except Exception:
+            pass
 
     def save_state(self):
         self.settings.setValue("window/geometry", self.saveGeometry())
@@ -152,3 +171,80 @@ class ADBManager(QWidget):
 
         self.save_state()
         super().closeEvent(event)
+
+    def _find_plus_index(self) -> int:
+        for i in range(self.tabs.count()):
+            if self.tabs.tabText(i) == "+":
+                return i
+        return -1
+
+    def _ensure_single_plus(self):
+        for i in reversed(range(self.tabs.count())):
+            if self.tabs.tabText(i) == "+":
+                self.tabs.removeTab(i)
+        plus = QWidget()
+        self._plus_tab_index = self.tabs.addTab(plus, "+")
+        self._hide_close_icon_for_protected_tabs()
+    
+    def _on_tab_close_requested(self, index: int):
+        if index == self._plus_tab_index:
+            return
+        title = self.tabs.tabText(index)
+        if title in ("Control", "About"):
+            return
+        
+        w = self.tabs.widget(index)
+        self._ssh_tabs.pop(w, None)
+        
+        self.tabs.removeTab(index)
+        if w:
+            w.deleteLater()
+        
+        self._plus_tab_index = self._find_plus_index()
+        self._hide_close_icon_for_protected_tabs()
+    
+    def _create_ssh_tab_via_dialog(self):
+        saved = DataManager.load_ssh_connections()
+        dlg = SSHConnectDialog(self, saved_connections=saved)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            self.tabs.setCurrentIndex(0)
+            return
+        
+        cfg = dlg.get_result()
+        remote_tab = RemoteControlTab(cfg, self.devices, self.commands)
+        
+        title = f"{cfg.get('name') or cfg['host']}"
+        
+        insert_idx = 1
+        self.tabs.insertTab(insert_idx, remote_tab, f"SSH: {title}")
+        self.tabs.setCurrentIndex(insert_idx)
+        
+        self._ssh_tabs[remote_tab] = cfg
+        
+        self._plus_tab_index = self._find_plus_index()
+        self._hide_close_icon_for_protected_tabs()
+        
+        all_conns = DataManager.load_ssh_connections()
+        key = (cfg["host"], int(cfg["port"]), cfg["user"])
+        bykey = {(c["host"], int(c["port"]), c["user"]): i for i, c in enumerate(all_conns)}
+        if key in bykey:
+            all_conns[bykey[key]] = cfg
+        else:
+            all_conns.append(cfg)
+        DataManager.save_ssh_connections(all_conns)
+    
+    def _hide_close_icon_for_protected_tabs(self):
+        bar = self.tabs.tabBar()
+        protected = []
+        for i in range(self.tabs.count()):
+            if self.tabs.tabText(i) in ("Control", "About", "+"):
+                protected.append(i)
+        for i in protected:
+            for pos in (QTabBar.ButtonPosition.LeftSide, QTabBar.ButtonPosition.RightSide):
+                try:
+                    btn = bar.tabButton(i, pos)
+                    if btn:
+                        btn.deleteLater()
+                    bar.setTabButton(i, pos, None)
+                except Exception:
+                    pass

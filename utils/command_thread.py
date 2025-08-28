@@ -169,15 +169,6 @@ class CommandThread(QThread):
         self.command_finished.emit(self.device, self.command, self._success, self._elapsed_time)
 
     def _handle_generic(self, argv: List[str]):
-        """
-        Универсальный запуск: всё, что не install/uninstall.
-        Примеры:
-          "shell getprop ro.product.model"
-          "push local.txt /sdcard/local.txt"
-          "pull /sdcard/log.txt ./log.txt"
-          "reboot"
-          "logcat -d"
-        """
         if not argv:
             self._emit_error_and_finish("ERROR: Empty command.")
             self._success = False
